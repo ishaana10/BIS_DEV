@@ -271,9 +271,7 @@ function nuFlushRedisCache() {
 function nuInjectRedisSetupTab() {
     if (document.getElementById('nu-redis-tab-btn')) return;
 
-    var tabHolder = document.getElementById('nuTabHolder') || document.querySelector('.nuTabHolder') || document.querySelector('tr[id*="nuTab"]');
-    var tabContainer = document.querySelector('.nuTabTitleColumn') || tabHolder;
-
+    var tabContainer = document.querySelector('.nuTabTitleColumn') || document.getElementById('nuTabHolder') || document.querySelector('tr[id*="nuTab"]');
     if (!tabContainer) return;
 
     var tabBtn = document.createElement('button');
@@ -281,25 +279,48 @@ function nuInjectRedisSetupTab() {
     tabBtn.type = 'button';
     tabBtn.className = 'nuTabButton';
     tabBtn.innerHTML = '⚙️ Redis Cache & Sessions';
-    tabBtn.style.cssText = 'padding: 8px 16px; font-weight: bold; border-radius: 6px 6px 0 0; background: #e2e8f0; border: 1px solid #cbd5e1; cursor: pointer; margin-right: 4px;';
+    tabBtn.style.cssText = 'padding: 6px 14px; font-weight: bold; border-radius: 6px 6px 0 0; background: #e2e8f0; color: #334155; border: 1px solid #cbd5e1; cursor: pointer; margin-left: 8px; font-size: 11px; font-family: inherit; vertical-align: bottom;';
 
     var panelDiv = document.createElement('div');
     panelDiv.id = 'nu-redis-tab-panel';
     panelDiv.style.display = 'none';
+    panelDiv.style.cssText = 'position: relative; z-index: 1000; background: #f8fafc; border-radius: 12px; margin-top: 15px; border: 1px solid #e2e8f0;';
     panelDiv.innerHTML = window.nuRedisSetupHtml || '';
 
     var formHolder = document.getElementById('nuActionHolder') || document.getElementById('outer') || document.body;
     formHolder.appendChild(panelDiv);
 
-    tabBtn.onclick = function() {
+    // Hide Redis panel when standard tabs are clicked
+    document.querySelectorAll('.nuTabButton, .nuTabTitle, [id^="nuTab_"]').forEach(function(el) {
+        el.addEventListener('click', function() {
+            panelDiv.style.display = 'none';
+            tabBtn.style.background = '#e2e8f0';
+            tabBtn.style.color = '#334155';
+            document.querySelectorAll('[id^="sob_"], [id^="nuTabDiv"], .nuObjectHolder, textarea, select, input').forEach(function(item) {
+                if (item.id !== 'nu-redis-tab-btn' && !panelDiv.contains(item)) {
+                    item.style.visibility = 'visible';
+                }
+            });
+        });
+    });
+
+    tabBtn.onclick = function(e) {
+        if (e) e.preventDefault();
+
+        // Deactivate standard tab styles
         document.querySelectorAll('.nuTabButton, .nuTabTitle').forEach(function(el) {
             el.style.background = '#e2e8f0';
             el.style.color = '#334155';
         });
-        document.querySelectorAll('[id^="nuTabDiv"], [id^="nuTabPanel"], .nuTabDiv').forEach(function(el) {
-            el.style.display = 'none';
+
+        // Hide form fields & sub-tab containers
+        document.querySelectorAll('[id^="sob_"], [id^="nuTabDiv"], [id^="nuTabPanel"], .nuTabDiv, .nuObjectHolder, textarea, select').forEach(function(el) {
+            if (!panelDiv.contains(el)) {
+                el.style.visibility = 'hidden';
+            }
         });
 
+        // Activate Redis tab
         tabBtn.style.background = '#0284c7';
         tabBtn.style.color = '#ffffff';
         panelDiv.style.display = 'block';
