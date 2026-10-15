@@ -19,11 +19,10 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 $isGlobeAdmin = $_SESSION['nubuilder_session_data']['isGlobeadmin'] ?? false;
-$isAuthUser   = !empty($_SESSION['nubuilder_session_data']['SESSION_ID']);
 
-if (!$isGlobeAdmin && !$isAuthUser) {
+if (!$isGlobeAdmin) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'error' => 'Access denied: Authentication required']);
+    echo json_encode(['success' => false, 'error' => 'Access denied: Globeadmin role required']);
     exit();
 }
 
@@ -134,6 +133,27 @@ try {
                 'error' => 'Benchmark read mismatch or key storage failure.'
             ]);
         }
+        exit();
+    }
+
+    if ($action === 'start_redis_daemon') {
+        $homeDir = getenv('HOME');
+        if ($homeDir) {
+            @touch($homeDir . '/.redis.on');
+        }
+
+        \NuCache::resetInstance();
+        $cache = \NuCache::getInstance();
+
+        $exists = file_exists($socketPath);
+        $isConnected = $cache->isEnabled();
+
+        echo json_encode([
+            'success' => true,
+            'socket_exists' => $exists,
+            'is_connected' => $isConnected,
+            'message' => 'Created ~/.redis.on flag on disk. A2 Hosting background process will initialize the Redis daemon.'
+        ]);
         exit();
     }
 

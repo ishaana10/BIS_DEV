@@ -74,6 +74,10 @@ function nuConfigScript() {
 
 	}
 
+	if (function_exists('nuRenderRedisSetupTab')) {
+		$js .= "\n window.nuRedisSetupHtml = " . json_encode(nuRenderRedisSetupTab()) . ";\n";
+	}
+
     return [
         'code' => $code,
         'js' => $js
@@ -93,6 +97,185 @@ function nuCleanConfigValue($v) {
         }
     }
 
+}
+
+function nuRenderRedisSetupTab() {
+    return <<<'HTML'
+<div id="nu-redis-panel" class="nu-redis-container" style="font-family: system-ui, -apple-system, sans-serif; padding: 20px; background: #f8fafc; border-radius: 12px; margin-top: 15px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 15px;">
+        <div>
+            <h3 style="margin: 0; color: #1e293b; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
+                ⚙️ REDIS HIGH-PERFORMANCE CACHE & SESSION MANAGEMENT STATUS
+            </h3>
+            <p style="margin: 4px 0 0 0; color: #64748b; font-size: 11px;">Live memory diagnostics, latency benchmark, active sessions, and key metrics</p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <button type="button" onclick="nuFetchRedisDiagnostics()" style="padding: 6px 12px; background: #e2e8f0; color: #1e293b; border: none; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer;">🔄 Refresh Metrics</button>
+            <button type="button" onclick="nuTestRedisPing()" style="padding: 6px 12px; background: #2563eb; color: #ffffff; border: none; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer;">⏲️ Test Latency (Benchmark)</button>
+        </div>
+    </div>
+
+    <!-- Cards Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 15px;">
+        <div style="padding: 12px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;">
+            <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase;">CONNECTION STATUS</div>
+            <div id="nu-redis-card-status" style="font-size: 13px; font-weight: 700; margin-top: 4px; color: #16a34a;">🟢 Connected & Operational</div>
+            <div id="nu-redis-card-scheme" style="font-size: 10px; color: #94a3b8; font-family: monospace; margin-top: 2px;">Scheme: unix</div>
+        </div>
+        <div style="padding: 12px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;">
+            <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase;">REDIS MEMORY & ENGINE</div>
+            <div id="nu-redis-card-memory" style="font-size: 13px; font-weight: 700; margin-top: 4px; color: #0f172a;">527.65K</div>
+            <div id="nu-redis-card-version" style="font-size: 10px; color: #94a3b8; font-family: monospace; margin-top: 2px;">Version: --</div>
+        </div>
+        <div style="padding: 12px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;">
+            <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase;">CACHED APP OBJECTS</div>
+            <div id="nu-redis-card-keys" style="font-size: 16px; font-weight: 700; margin-top: 4px; color: #2563eb;">0</div>
+            <div style="font-size: 10px; color: #94a3b8; font-family: monospace; margin-top: 2px;">Prefix: nuvis:*</div>
+        </div>
+        <div style="padding: 12px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;">
+            <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase;">REDIS ACTIVE SESSIONS</div>
+            <div id="nu-redis-card-sessions" style="font-size: 16px; font-weight: 700; margin-top: 4px; color: #16a34a;">0</div>
+            <div style="font-size: 10px; color: #94a3b8; font-family: monospace; margin-top: 2px;">Prefix: nuvis:sess:*</div>
+        </div>
+    </div>
+
+    <!-- Daemon Banner -->
+    <div style="padding: 12px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <div>
+            <div style="font-size: 12px; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 4px;">💭 A2 Hosting Turbo Max Redis Daemon Initialization</div>
+            <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Socket Path: <code id="nu-redis-socket-display" style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: monospace; border: 1px solid #cbd5e1;">/home/ictfjcom/.redis/redis.sock</code></div>
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <button type="button" onclick="nuTriggerStartRedisDaemon()" style="padding: 8px 12px; background: #b45309; color: #ffffff; border: none; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer;">⏻ Start A2 Hosting Redis Daemon (~/.redis.on)</button>
+            <button type="button" onclick="nuFlushRedisCache()" style="padding: 8px 12px; background: #e11d48; color: #ffffff; border: none; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer;">🧹 Flush Nuvis Cache</button>
+        </div>
+    </div>
+
+    <!-- Benchmark Result Box -->
+    <div id="nu-redis-benchmark-result" style="display: none; padding: 12px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; margin-bottom: 15px; font-size: 11px; font-family: monospace; color: #1e3a8a;">
+        <div id="nu-redis-benchmark-text"></div>
+    </div>
+
+    <!-- Keys Table -->
+    <div>
+        <div style="font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 8px;">SAMPLE CACHED KEYS & TIME TO LIVE (TTL)</div>
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; text-align: left; font-size: 11px; font-family: monospace;">
+                <thead>
+                    <tr style="background: #f1f5f9; color: #64748b; text-transform: uppercase; font-size: 10px;">
+                        <th style="padding: 8px 12px;">CACHE KEY NAME</th>
+                        <th style="padding: 8px 12px;">FULL REDIS KEY</th>
+                        <th style="padding: 8px 12px; text-align: right;">TTL (TIME TO LIVE)</th>
+                    </tr>
+                </thead>
+                <tbody id="nu-redis-keys-tbody">
+                    <tr><td colspan="3" style="padding: 12px; text-align: center; color: #94a3b8; font-family: sans-serif; italic;">Loading cached keys...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+function nuFetchRedisDiagnostics() {
+    fetch('actions/redis_actions.php?action=get_redis_status')
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) {
+            const socketEl = document.getElementById('nu-redis-socket-display');
+            if (socketEl) socketEl.textContent = d.socket_path || '/home/ictfjcom/.redis/redis.sock';
+
+            const statusEl = document.getElementById('nu-redis-card-status');
+            if (statusEl) {
+                statusEl.innerHTML = d.is_connected
+                    ? '🟢 Connected & Operational'
+                    : '🟡 Socket Offline (~/.redis.on required)';
+            }
+
+            document.getElementById('nu-redis-card-memory').textContent = d.used_memory || '--';
+            document.getElementById('nu-redis-card-version').textContent = 'Version: ' + (d.redis_version || '--');
+            document.getElementById('nu-redis-card-keys').textContent = d.cached_keys_count || 0;
+            document.getElementById('nu-redis-card-sessions').textContent = d.active_sessions_count || 0;
+
+            const tbody = document.getElementById('nu-redis-keys-tbody');
+            if (tbody) {
+                if (d.keys_sample && d.keys_sample.length > 0) {
+                    tbody.innerHTML = d.keys_sample.map(k => `
+                        <tr style="border-top: 1px solid #f1f5f9;">
+                            <td style="padding: 8px 12px; font-weight: 700; color: #2563eb;">${k.key}</td>
+                            <td style="padding: 8px 12px; color: #475569;">${k.full_key}</td>
+                            <td style="padding: 8px 12px; text-align: right; color: #16a34a; font-weight: 700;">${k.ttl}</td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="3" style="padding: 12px; text-align: center; color: #94a3b8; font-family: sans-serif;">No active keys currently cached under prefix.</td></tr>';
+                }
+            }
+        }
+    });
+}
+
+function nuTestRedisPing() {
+    const resBox = document.getElementById('nu-redis-benchmark-result');
+    const resText = document.getElementById('nu-redis-benchmark-text');
+    if (resBox) resBox.style.display = 'block';
+    if (resText) resText.innerHTML = 'Running SET/GET/DEL latency benchmark...';
+
+    fetch('actions/redis_actions.php?action=test_redis_ping')
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) {
+            resText.innerHTML = '✔ ' + d.message;
+            nuFetchRedisDiagnostics();
+        } else {
+            resText.innerHTML = '❌ Benchmark Failed: ' + (d.error || 'Error');
+        }
+    });
+}
+
+function nuTriggerStartRedisDaemon() {
+    fetch('actions/redis_actions.php?action=start_redis_daemon')
+    .then(r => r.json())
+    .then(d => {
+        alert(d.message || 'Daemon trigger set.');
+        nuFetchRedisDiagnostics();
+    });
+}
+
+function nuFlushRedisCache() {
+    if (!confirm('Are you sure you want to flush all Nuvis cached objects in Redis?')) return;
+    fetch('actions/redis_actions.php?action=flush_cache')
+    .then(r => r.json())
+    .then(d => {
+        alert(d.message || 'Cache flushed.');
+        nuFetchRedisDiagnostics();
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (document.getElementById('nu-redis-panel')) {
+        nuFetchRedisDiagnostics();
+    }
+});
+
+function nuMountRedisTab() {
+    if (document.getElementById('nu-redis-panel')) return;
+    var holder = document.getElementById('nuTabHolder') || document.body;
+    var div = document.createElement('div');
+    div.innerHTML = window.nuRedisSetupHtml || '';
+    holder.appendChild(div);
+    if (typeof nuFetchRedisDiagnostics === 'function') {
+        nuFetchRedisDiagnostics();
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', nuMountRedisTab);
+} else {
+    setTimeout(nuMountRedisTab, 500);
+}
+</script>
+HTML;
 }
 
 ?>
