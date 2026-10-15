@@ -6,6 +6,27 @@
 	if ( !session_id() ) {
 
 		nuCheckGarbageCollector();
+
+		global $nuConfigRedis;
+		if (!empty($nuConfigRedis['enabled']) && extension_loaded('redis')) {
+			try {
+				require_once(dirname(__FILE__) . '/Cache.php');
+				require_once(dirname(__FILE__) . '/RedisSessionHandler.php');
+
+				$cache = \NuCache::getInstance();
+				if ($cache->isEnabled() && $cache->client()) {
+					$handler = new \NuRedisSessionHandler(
+						$cache->client(),
+						($nuConfigRedis['prefix'] ?? 'nuvis:') . 'sess:',
+						isset($GLOBALS['nuConfigTimeOut']) ? ((int)$GLOBALS['nuConfigTimeOut'] * 60) : 1800
+					);
+					session_set_save_handler($handler, true);
+				}
+			} catch (\Throwable $e) {
+				error_log('[nuchoosesetup] Redis session handler setup failed: ' . $e->getMessage());
+			}
+		}
+
 		session_start(['cookie_lifetime' => 0,'cookie_secure' => nuIsHTTPS(),'cookie_httponly' => true]);
 
 	}

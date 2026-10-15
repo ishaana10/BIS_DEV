@@ -46,6 +46,21 @@
 
 	$nuConfigSettingsFromDB				= true;						//-- Use settings from setup->settings if set to true (default)	
 
+// Redis Configuration:
+
+	$nuConfigRedis = [
+		'enabled'     => true,                                  // set false to disable completely
+		'scheme'      => 'unix',                                // 'unix' or 'tcp'
+		'path'        => '/home/ictfjcom/.redis/redis.sock',    // unix socket path
+		'host'        => '127.0.0.1',                           // only if scheme is tcp
+		'port'        => 6379,                                  // TCP port
+		'password'    => null,                                  // redis password if required
+		'database'    => 0,                                     // database index (0-15)
+		'prefix'      => 'nuvis:',                              // prefix for key isolation
+		'timeout'     => 2.5,                                   // connection timeout in seconds
+		'default_ttl' => 300,                                   // default cache TTL in seconds
+	];
+
 
 
 // Uncomment this block to customise just the top line of the login form (default = nuBuilder Forte logo)
