@@ -76,6 +76,7 @@ function nuConfigScript() {
 
 	if (function_exists('nuRenderRedisSetupTab')) {
 		$js .= "\n window.nuRedisSetupHtml = " . json_encode(nuRenderRedisSetupTab()) . ";\n";
+		$js .= "\n" . nuRenderRedisSetupJS() . "\n";
 	}
 
     return [
@@ -176,7 +177,11 @@ function nuRenderRedisSetupTab() {
     </div>
 </div>
 
-<script>
+HTML;
+}
+
+function nuRenderRedisSetupJS() {
+    return <<<'JS'
 function nuFetchRedisDiagnostics() {
     fetch('actions/redis_actions.php?action=get_redis_status')
     .then(r => r.json())
@@ -192,19 +197,30 @@ function nuFetchRedisDiagnostics() {
                     : '🟡 Socket Offline (~/.redis.on required)';
             }
 
-            document.getElementById('nu-redis-card-memory').textContent = d.used_memory || '--';
-            document.getElementById('nu-redis-card-version').textContent = 'Version: ' + (d.redis_version || '--');
-            document.getElementById('nu-redis-card-keys').textContent = d.cached_keys_count || 0;
-            document.getElementById('nu-redis-card-sessions').textContent = d.active_sessions_count || 0;
+            const memEl = document.getElementById('nu-redis-card-memory');
+            if (memEl) memEl.textContent = d.used_memory || '--';
+
+            const verEl = document.getElementById('nu-redis-card-version');
+            if (verEl) verEl.textContent = 'Version: ' + (d.redis_version || '--');
+
+            const keysEl = document.getElementById('nu-redis-card-keys');
+            if (keysEl) keysEl.textContent = d.cached_keys_count || 0;
+
+            const sessEl = document.getElementById('nu-redis-card-sessions');
+            if (sessEl) sessEl.textContent = d.active_sessions_count || 0;
 
             const tbody = document.getElementById('nu-redis-keys-tbody');
             if (tbody) {
                 if (d.keys_sample && d.keys_sample.length > 0) {
+                    function escapeHtml(str) {
+                        if (!str) return '';
+                        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+                    }
                     tbody.innerHTML = d.keys_sample.map(k => `
                         <tr style="border-top: 1px solid #f1f5f9;">
-                            <td style="padding: 8px 12px; font-weight: 700; color: #2563eb;">${k.key}</td>
-                            <td style="padding: 8px 12px; color: #475569;">${k.full_key}</td>
-                            <td style="padding: 8px 12px; text-align: right; color: #16a34a; font-weight: 700;">${k.ttl}</td>
+                            <td style="padding: 8px 12px; font-weight: 700; color: #2563eb;">${escapeHtml(k.key)}</td>
+                            <td style="padding: 8px 12px; color: #475569;">${escapeHtml(k.full_key)}</td>
+                            <td style="padding: 8px 12px; text-align: right; color: #16a34a; font-weight: 700;">${escapeHtml(k.ttl)}</td>
                         </tr>
                     `).join('');
                 } else {
@@ -252,30 +268,58 @@ function nuFlushRedisCache() {
     });
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    if (document.getElementById('nu-redis-panel')) {
-        nuFetchRedisDiagnostics();
-    }
-});
+function nuInjectRedisSetupTab() {
+    if (document.getElementById('nu-redis-tab-btn')) return;
 
-function nuMountRedisTab() {
-    if (document.getElementById('nu-redis-panel')) return;
-    var holder = document.getElementById('nuTabHolder') || document.body;
-    var div = document.createElement('div');
-    div.innerHTML = window.nuRedisSetupHtml || '';
-    holder.appendChild(div);
-    if (typeof nuFetchRedisDiagnostics === 'function') {
-        nuFetchRedisDiagnostics();
-    }
+    var tabHolder = document.getElementById('nuTabHolder') || document.querySelector('.nuTabHolder') || document.querySelector('tr[id*="nuTab"]');
+    var tabContainer = document.querySelector('.nuTabTitleColumn') || tabHolder;
+
+    if (!tabContainer) return;
+
+    var tabBtn = document.createElement('button');
+    tabBtn.id = 'nu-redis-tab-btn';
+    tabBtn.type = 'button';
+    tabBtn.className = 'nuTabButton';
+    tabBtn.innerHTML = '⚙️ Redis Cache & Sessions';
+    tabBtn.style.cssText = 'padding: 8px 16px; font-weight: bold; border-radius: 6px 6px 0 0; background: #e2e8f0; border: 1px solid #cbd5e1; cursor: pointer; margin-right: 4px;';
+
+    var panelDiv = document.createElement('div');
+    panelDiv.id = 'nu-redis-tab-panel';
+    panelDiv.style.display = 'none';
+    panelDiv.innerHTML = window.nuRedisSetupHtml || '';
+
+    var formHolder = document.getElementById('nuActionHolder') || document.getElementById('outer') || document.body;
+    formHolder.appendChild(panelDiv);
+
+    tabBtn.onclick = function() {
+        document.querySelectorAll('.nuTabButton, .nuTabTitle').forEach(function(el) {
+            el.style.background = '#e2e8f0';
+            el.style.color = '#334155';
+        });
+        document.querySelectorAll('[id^="nuTabDiv"], [id^="nuTabPanel"], .nuTabDiv').forEach(function(el) {
+            el.style.display = 'none';
+        });
+
+        tabBtn.style.background = '#0284c7';
+        tabBtn.style.color = '#ffffff';
+        panelDiv.style.display = 'block';
+
+        if (typeof nuFetchRedisDiagnostics === 'function') {
+            nuFetchRedisDiagnostics();
+        }
+    };
+
+    tabContainer.appendChild(tabBtn);
 }
 
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', nuMountRedisTab);
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(nuInjectRedisSetupTab, 600);
+    });
 } else {
-    setTimeout(nuMountRedisTab, 500);
+    setTimeout(nuInjectRedisSetupTab, 600);
 }
-</script>
-HTML;
+JS;
 }
 
 ?>
