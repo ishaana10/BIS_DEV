@@ -22,6 +22,18 @@ $sessionData  = $_SESSION['nubuilder_session_data'] ?? [];
 $isGlobeAdmin = !empty($sessionData['isGlobeadmin']);
 $isAuthUser   = !empty($sessionData['SESSION_ID']) || !empty($sessionData['user_id']) || !empty($_SESSION['authenticated']);
 
+// Check if user is logged in via standard cookie session if session array not hydrated
+if (!$isGlobeAdmin && !$isAuthUser) {
+    $cookieSession = $_COOKIE['nu_session_id'] ?? ($_COOKIE['nu_' . ($nuConfigDBName ?? '')] ?? null);
+    if (!empty($cookieSession) && file_exists(__DIR__ . '/../core/nudatabase.php')) {
+        require_once __DIR__ . '/../core/nudatabase.php';
+        $t = @nuRunQuery("SELECT sss_access FROM zzzzsys_session WHERE zzzzsys_session_id = ?", [$cookieSession]);
+        if ($t && @db_num_rows($t) > 0) {
+            $isAuthUser = true;
+        }
+    }
+}
+
 if (!$isGlobeAdmin && !$isAuthUser) {
     http_response_code(403);
     echo json_encode(['success' => false, 'error' => 'Access denied: Globeadmin or authenticated session required']);
