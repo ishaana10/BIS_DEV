@@ -286,77 +286,41 @@ function nuFlushRedisCache() {
 function nuInjectRedisSetupTab() {
     if (document.getElementById('nu-redis-tab-btn')) return;
 
-    // Locate setup tab header container in nuBuilder
-    var allTabs = document.querySelectorAll('[id^="nuTab"]');
-    var tabHolder = document.querySelector('.nuTabTitleColumn') || document.getElementById('nuTabHolder');
-    if (!allTabs.length && !tabHolder) return;
+    var refTab = document.querySelector('.nuTab[data-nu-tab-filter]');
+    var formFilter = refTab ? refTab.getAttribute('data-nu-form-filter') : 'nusetup';
 
-    var lastTab = allTabs.length ? allTabs[allTabs.length - 1] : null;
-    var container = (lastTab && lastTab.parentNode) ? lastTab.parentNode : tabHolder;
+    var container = refTab ? refTab.parentNode : (document.querySelector('.nuTabTitleColumn') || document.getElementById('nuTabHolder'));
+    if (!container) return;
 
-    var tabBtn = document.createElement('span');
+    var tabBtn = document.createElement('div');
     tabBtn.id = 'nu-redis-tab-btn';
-    tabBtn.className = lastTab ? lastTab.className : 'nuTabTitle';
+    tabBtn.className = 'nuTab nuDragNoSelect';
     tabBtn.innerHTML = 'Redis Cache & Sessions';
+    tabBtn.setAttribute('data-nu-tab-filter', 'redis');
+    tabBtn.setAttribute('data-nu-form-filter', formFilter);
+    tabBtn.style.cssText = 'cursor: pointer; display: inline-block; margin: 0 8px; padding: 2px 6px; font-weight: normal;';
 
-    // Style tabBtn to match nuBuilder's standard inline tabs (.nuTabTitle)
-    tabBtn.style.cursor = 'pointer';
-    tabBtn.style.display = 'inline-block';
-    tabBtn.style.margin = '0 8px';
-    tabBtn.style.padding = '2px 6px';
-
-    if (lastTab && lastTab.nextSibling) {
-        container.insertBefore(tabBtn, lastTab.nextSibling);
-    } else {
-        container.appendChild(tabBtn);
-    }
-
-    var panelDiv = document.createElement('div');
-    panelDiv.id = 'nu-redis-tab-panel';
-    panelDiv.style.display = 'none';
-    panelDiv.style.cssText = 'position: relative; z-index: 100; background: #f8fafc; border-radius: 12px; margin-top: 15px; border: 1px solid #e2e8f0; clear: both;';
-    panelDiv.innerHTML = window.nuRedisSetupHtml || '';
-
-    // Append tab content panel to #nuRECORD where all nuBuilder form fields & tab contents reside
-    var formRecordContainer = document.getElementById('nuRECORD') || document.getElementById('nuTabHolder') || document.getElementById('nuActionHolder') || document.getElementById('outer') || document.body;
-    formRecordContainer.appendChild(panelDiv);
-
-    function hideRedisPanel() {
-        panelDiv.style.display = 'none';
-        tabBtn.style.fontWeight = 'normal';
-    }
-
-    // Attach click listeners to standard tabs to cleanly hide Redis panel
-    document.querySelectorAll('.nuTabTitle, [id^="nuTab"]').forEach(function(el) {
-        if (el !== tabBtn) {
-            el.addEventListener('click', hideRedisPanel);
+    tabBtn.onclick = function() {
+        if (typeof nuSelectTab === 'function') {
+            nuSelectTab(this, true);
         }
-    });
-
-    tabBtn.onclick = function(e) {
-        if (e) e.preventDefault();
-
-        // Unbold / reset standard tab titles visually
-        document.querySelectorAll('.nuTabTitle, [id^="nuTab"]').forEach(function(el) {
-            if (el !== tabBtn) {
-                el.style.fontWeight = 'normal';
-            }
-        });
-
-        // Hide standard nuBuilder form tab panels cleanly inside #nuRECORD
-        document.querySelectorAll('#nuRECORD > div, [id^="nuTabDiv_"], [id^="nuTabHolder_"], div.nuTabDiv').forEach(function(tabDiv) {
-            if (tabDiv !== panelDiv && tabDiv !== container && !container.contains(tabDiv)) {
-                tabDiv.style.display = 'none';
-            }
-        });
-
-        tabBtn.style.fontWeight = 'bold';
-        panelDiv.style.display = 'block';
-
         if (typeof nuFetchRedisDiagnostics === 'function') {
             nuFetchRedisDiagnostics();
         }
     };
+
+    container.appendChild(tabBtn);
+
+    var panelDiv = document.createElement('div');
+    panelDiv.id = 'nu-redis-tab-panel';
+    panelDiv.setAttribute('data-nu-tab', 'redis');
+    panelDiv.setAttribute('data-nu-form', formFilter);
+    panelDiv.style.display = 'none';
+    panelDiv.style.cssText = 'position: relative; z-index: 100; background: #f8fafc; border-radius: 12px; margin-top: 15px; border: 1px solid #e2e8f0; clear: both;';
+    panelDiv.innerHTML = window.nuRedisSetupHtml || '';
+
+    var formRecordContainer = document.getElementById('nuRECORD') || document.body;
+    formRecordContainer.appendChild(panelDiv);
 }
 
 if (document.readyState === 'loading') {
