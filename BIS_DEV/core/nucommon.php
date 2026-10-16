@@ -5,7 +5,7 @@ error_reporting( error_reporting() & ~E_NOTICE );
 require_once('nuchoosesetup.php');
 require_once('nubuilders.php');
 require_once('nuemailer.php');
-require_once('Cache.php');
+require_once __DIR__ . '/Cache.php';
 
 nuSetTimeLimit(0);
 
