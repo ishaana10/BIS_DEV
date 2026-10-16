@@ -228,6 +228,9 @@ function nuFetchRedisDiagnostics() {
                 }
             }
         }
+    })
+    .catch(err => {
+        console.error('Error fetching Redis status:', err);
     });
 }
 
@@ -246,6 +249,10 @@ function nuTestRedisPing() {
         } else {
             resText.innerHTML = '❌ Benchmark Failed: ' + (d.error || 'Error');
         }
+    })
+    .catch(err => {
+        if (resText) resText.innerHTML = '❌ Benchmark Failed: Network/Server Error';
+        console.error('Error running latency benchmark:', err);
     });
 }
 
@@ -255,6 +262,10 @@ function nuTriggerStartRedisDaemon() {
     .then(d => {
         alert(d.message || 'Daemon trigger set.');
         nuFetchRedisDiagnostics();
+    })
+    .catch(err => {
+        alert('Failed to trigger Redis daemon.');
+        console.error('Error starting daemon:', err);
     });
 }
 
@@ -265,71 +276,86 @@ function nuFlushRedisCache() {
     .then(d => {
         alert(d.message || 'Cache flushed.');
         nuFetchRedisDiagnostics();
+    })
+    .catch(err => {
+        alert('Failed to flush cache.');
+        console.error('Error flushing cache:', err);
     });
 }
 
 function nuInjectRedisSetupTab() {
     if (document.getElementById('nu-redis-tab-btn')) return;
 
-    var tabContainer = document.querySelector('.nuTabTitleColumn') || document.getElementById('nuTabHolder') || document.querySelector('tr[id*="nuTab"]');
-    if (!tabContainer) return;
+    // Locate setup tab header container in nuBuilder
+    var allTabs = document.querySelectorAll('[id^="nuTab"]');
+    var tabHolder = document.querySelector('.nuTabTitleColumn') || document.getElementById('nuTabHolder');
+    if (!allTabs.length && !tabHolder) return;
 
-    var tabBtn = document.createElement('button');
+    var lastTab = allTabs.length ? allTabs[allTabs.length - 1] : null;
+    var container = (lastTab && lastTab.parentNode) ? lastTab.parentNode : tabHolder;
+
+    var tabBtn = document.createElement('span');
     tabBtn.id = 'nu-redis-tab-btn';
-    tabBtn.type = 'button';
-    tabBtn.className = 'nuTabButton';
-    tabBtn.innerHTML = '⚙️ Redis Cache & Sessions';
-    tabBtn.style.cssText = 'padding: 6px 14px; font-weight: bold; border-radius: 6px 6px 0 0; background: #e2e8f0; color: #334155; border: 1px solid #cbd5e1; cursor: pointer; margin-left: 8px; font-size: 11px; font-family: inherit; vertical-align: bottom;';
+    tabBtn.className = lastTab ? lastTab.className : 'nuTabTitle';
+    tabBtn.innerHTML = 'Redis Cache & Sessions';
+
+    // Style tabBtn to match nuBuilder's standard inline tabs (.nuTabTitle)
+    tabBtn.style.cursor = 'pointer';
+    tabBtn.style.display = 'inline-block';
+    tabBtn.style.margin = '0 8px';
+    tabBtn.style.padding = '2px 6px';
+
+    if (lastTab && lastTab.nextSibling) {
+        container.insertBefore(tabBtn, lastTab.nextSibling);
+    } else {
+        container.appendChild(tabBtn);
+    }
 
     var panelDiv = document.createElement('div');
     panelDiv.id = 'nu-redis-tab-panel';
     panelDiv.style.display = 'none';
-    panelDiv.style.cssText = 'position: relative; z-index: 1000; background: #f8fafc; border-radius: 12px; margin-top: 15px; border: 1px solid #e2e8f0;';
+    panelDiv.style.cssText = 'position: relative; z-index: 100; background: #f8fafc; border-radius: 12px; margin-top: 15px; border: 1px solid #e2e8f0; clear: both;';
     panelDiv.innerHTML = window.nuRedisSetupHtml || '';
 
     var formHolder = document.getElementById('nuTabHolder') || document.getElementById('nuActionHolder') || document.getElementById('outer') || document.body;
     formHolder.appendChild(panelDiv);
 
-    function showStandardTabContent() {
+    function hideRedisPanel() {
         panelDiv.style.display = 'none';
-        tabBtn.style.background = '#e2e8f0';
-        tabBtn.style.color = '#334155';
+        tabBtn.style.fontWeight = 'normal';
     }
 
-    // Attach click listener to existing tab titles/buttons to hide Redis panel without altering other tabs' inline display
-    document.querySelectorAll('.nuTabButton, .nuTabTitle, [id^="nuTab_"], [id^="nuTabTitle"]').forEach(function(el) {
+    // Attach click listeners to standard tabs to cleanly hide Redis panel
+    document.querySelectorAll('.nuTabTitle, [id^="nuTab"]').forEach(function(el) {
         if (el !== tabBtn) {
-            el.addEventListener('click', showStandardTabContent);
+            el.addEventListener('click', hideRedisPanel);
         }
     });
 
     tabBtn.onclick = function(e) {
         if (e) e.preventDefault();
 
-        // Deactivate standard tab styles
-        document.querySelectorAll('.nuTabButton, .nuTabTitle').forEach(function(el) {
+        // Unbold / reset standard tab titles visually
+        document.querySelectorAll('.nuTabTitle, [id^="nuTab"]').forEach(function(el) {
             if (el !== tabBtn) {
-                el.style.background = '#e2e8f0';
-                el.style.color = '#334155';
+                el.style.fontWeight = 'normal';
             }
         });
 
-        // Hide only nuBuilder's tab divs rather than forcibly clearing display properties
-        document.querySelectorAll('[id^="nuTabDiv_"]').forEach(function(tabDiv) {
-            tabDiv.style.display = 'none';
+        // Hide standard nuBuilder form tab panels cleanly
+        document.querySelectorAll('[id^="nuTabDiv_"], [id^="nuTabHolder_"], div.nuTabDiv, div[id*="nuTab"]').forEach(function(tabDiv) {
+            if (tabDiv !== panelDiv && tabDiv !== container && !container.contains(tabDiv)) {
+                tabDiv.style.display = 'none';
+            }
         });
 
-        // Activate Redis tab button and panel
-        tabBtn.style.background = '#0284c7';
-        tabBtn.style.color = '#ffffff';
+        tabBtn.style.fontWeight = 'bold';
         panelDiv.style.display = 'block';
 
         if (typeof nuFetchRedisDiagnostics === 'function') {
             nuFetchRedisDiagnostics();
         }
     };
-
-    tabContainer.appendChild(tabBtn);
 }
 
 if (document.readyState === 'loading') {
