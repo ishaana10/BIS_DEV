@@ -18,11 +18,13 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-$isGlobeAdmin = $_SESSION['nubuilder_session_data']['isGlobeadmin'] ?? false;
+$sessionData  = $_SESSION['nubuilder_session_data'] ?? [];
+$isGlobeAdmin = !empty($sessionData['isGlobeadmin']);
+$isAuthUser   = !empty($sessionData['SESSION_ID']) || !empty($sessionData['user_id']) || !empty($_SESSION['authenticated']);
 
-if (!$isGlobeAdmin) {
+if (!$isGlobeAdmin && !$isAuthUser) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'error' => 'Access denied: Globeadmin role required']);
+    echo json_encode(['success' => false, 'error' => 'Access denied: Globeadmin or authenticated session required']);
     exit();
 }
 
