@@ -2,11 +2,30 @@
 
 function nuFormProperties($f, $columns = ''){
 
-	$columns = $columns == '' ? '*' : $columns;
-	$query	= "SELECT $columns FROM zzzzsys_form WHERE zzzzsys_form_id = ? ";
+	$cache = NuCache::getInstance();
+	if ($cache->isEnabled()) {
+		$cached = $cache->get("form:meta:{$f}");
+		if ($cached !== null) {
+			return $cached === 'NOT_FOUND' ? false : $cached;
+		}
+	}
+
+	$query	= "SELECT * FROM zzzzsys_form WHERE zzzzsys_form_id = ? ";
 	$stmt	= nuRunQuery($query, [$f]);
 
-	return db_num_rows($stmt) == 0 ? false : db_fetch_object($stmt);
+	if (db_num_rows($stmt) == 0) {
+		if ($cache->isEnabled()) {
+			$cache->set("form:meta:{$f}", 'NOT_FOUND', 300);
+		}
+		return false;
+	}
+
+	$row = db_fetch_object($stmt);
+	if ($cache->isEnabled()) {
+		$cache->set("form:meta:{$f}", $row, 600);
+	}
+
+	return $row;
 
 }
 

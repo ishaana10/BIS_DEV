@@ -5,6 +5,7 @@ error_reporting( error_reporting() & ~E_NOTICE );
 require_once('nuchoosesetup.php');
 require_once('nubuilders.php');
 require_once('nuemailer.php');
+require_once('Cache.php');
 
 nuSetTimeLimit(0);
 
@@ -1272,6 +1273,14 @@ function nuBuildViewSchema(){
 
 function nuUpdateFormSchema($force_update = false){
 
+	$cache = class_exists('NuCache') ? \NuCache::getInstance() : null;
+	if ($cache && $cache->isEnabled() && !$force_update) {
+		$cached = $cache->get('sys:form_schema');
+		if ($cached !== null) {
+			return nuGlobalAccess() ? $cached : [];
+		}
+	}
+
 	$json		= nuGetJSONData('clientFormSchema');
 	if($json == '' || $force_update){
 
@@ -1280,20 +1289,38 @@ function nuUpdateFormSchema($force_update = false){
 
 	}
 
+	if ($cache && $cache->isEnabled() && !empty($json)) {
+		$cache->set('sys:form_schema', $json, 3600);
+	}
+
 	return nuGlobalAccess() ? $json : [];
 
 }
 
 function nuUpdateTableSchema($call_type, $force_update = false){
 
-	$j	= nuGetJSONData('clientTableSchema');
 	$formCode = nuObjKey(nuHash(),'form_code');
+	$mustForce = ($formCode == 'nufflaunch' || ($call_type == 'runhiddenphp' && $formCode == 'nuadddbcolumn') || $force_update);
 
-	if($formCode == 'nufflaunch' || ($call_type == 'runhiddenphp' && $formCode == 'nuadddbcolumn') || is_null($j) || $j == '' || $force_update == true ){
+	$cache = class_exists('NuCache') ? \NuCache::getInstance() : null;
+	if ($cache && $cache->isEnabled() && !$mustForce) {
+		$cached = $cache->get('sys:table_schema');
+		if ($cached !== null) {
+			return $cached;
+		}
+	}
+
+	$j	= nuGetJSONData('clientTableSchema');
+
+	if($mustForce || is_null($j) || $j == '' ){
 
 		$j	= nuBuildTableSchema();
 		nuSetJSONData('clientTableSchema', $j);			//-- force updating Table Schema
 
+	}
+
+	if ($cache && $cache->isEnabled() && !empty($j)) {
+		$cache->set('sys:table_schema', $j, 3600);
 	}
 
 	return $j;
