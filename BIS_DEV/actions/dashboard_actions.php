@@ -10,17 +10,6 @@ ini_set('display_errors', '0');
 
 session_start();
 
-$setupFile = __DIR__ . '/../core/nuchoosesetup.php';
-if (file_exists($setupFile)) {
-    require_once $setupFile;
-}
-
-if (file_exists(__DIR__ . '/../core/Cache.php')) {
-    require_once __DIR__ . '/../core/Cache.php';
-}
-
-header('Content-Type: application/json; charset=utf-8');
-
 function sendDashboardJson(array $response): void {
     while (ob_get_level()) {
         ob_end_clean();
@@ -33,6 +22,17 @@ function sendDashboardJson(array $response): void {
 if (empty($_SESSION['nubuilder_session_data']) && empty($_SESSION['nu_session_id'])) {
     sendDashboardJson(['status' => 'error', 'message' => 'Unauthorized']);
 }
+
+$setupFile = __DIR__ . '/../core/nuchoosesetup.php';
+if (file_exists($setupFile)) {
+    require_once $setupFile;
+}
+
+if (file_exists(__DIR__ . '/../core/Cache.php')) {
+    require_once __DIR__ . '/../core/Cache.php';
+}
+
+header('Content-Type: application/json; charset=utf-8');
 
 $action = $_REQUEST['action'] ?? '';
 $userId = $_SESSION['nubuilder_session_data']['USER_ID'] ?? $_SESSION['nu_session_id'] ?? 'guest';
