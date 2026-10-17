@@ -2,6 +2,7 @@
 /**
  * Dashboard Actions API Endpoint
  * Handles customizable low-code dashboard layouts and lazy-loaded widget metrics.
+ * Compatible with PHP 7.3+
  */
 
 ob_start();
@@ -10,7 +11,7 @@ ini_set('display_errors', '0');
 
 session_start();
 
-function sendDashboardJson(array $response): void {
+function sendDashboardJson(array $response) {
     while (ob_get_level()) {
         ob_end_clean();
     }
@@ -34,8 +35,8 @@ if (file_exists(__DIR__ . '/../core/Cache.php')) {
 
 header('Content-Type: application/json; charset=utf-8');
 
-$action = $_REQUEST['action'] ?? '';
-$userId = $_SESSION['nubuilder_session_data']['USER_ID'] ?? $_SESSION['nu_session_id'] ?? 'guest';
+$action = isset($_REQUEST['action']) ? $_REQUEST['action'] : '';
+$userId = isset($_SESSION['nubuilder_session_data']['USER_ID']) ? $_SESSION['nubuilder_session_data']['USER_ID'] : (isset($_SESSION['nu_session_id']) ? $_SESSION['nu_session_id'] : 'guest');
 
 $cache = NuCache::getInstance();
 
@@ -108,7 +109,7 @@ switch ($action) {
     case 'save_layout':
         $rawInput = file_get_contents('php://input');
         $data = json_decode($rawInput, true);
-        $layout = $data['layout'] ?? $_POST['layout'] ?? null;
+        $layout = isset($data['layout']) ? $data['layout'] : (isset($_POST['layout']) ? $_POST['layout'] : null);
 
         if (is_string($layout)) {
             $layout = json_decode($layout, true);
@@ -125,8 +126,8 @@ switch ($action) {
         break;
 
     case 'get_widget_data':
-        $widgetId = $_GET['widget_id'] ?? $_POST['widget_id'] ?? '';
-        $widgetType = $_GET['widget_type'] ?? $_POST['widget_type'] ?? '';
+        $widgetId = isset($_GET['widget_id']) ? $_GET['widget_id'] : (isset($_POST['widget_id']) ? $_POST['widget_id'] : '');
+        $widgetType = isset($_GET['widget_type']) ? $_GET['widget_type'] : (isset($_POST['widget_type']) ? $_POST['widget_type'] : '');
 
         $cacheKey = "dashboard:widget:data:{$widgetId}";
         $cachedData = $cache->get($cacheKey);
@@ -137,7 +138,7 @@ switch ($action) {
         $data = [];
 
         if ($widgetType === 'kpi') {
-            $metric = $_GET['metric'] ?? 'users';
+            $metric = isset($_GET['metric']) ? $_GET['metric'] : 'users';
             if ($metric === 'users') {
                 $count = 1;
                 if (function_exists('nuRunQuery')) {
@@ -163,7 +164,7 @@ switch ($action) {
                 $mem = '0 KB';
                 if ($cache->isEnabled() && ($client = $cache->client())) {
                     $info = @$client->info('memory');
-                    $mem = $info['used_memory_human'] ?? 'Active';
+                    $mem = isset($info['used_memory_human']) ? $info['used_memory_human'] : 'Active';
                 }
                 $data = ['value' => $mem, 'change' => 'Cached', 'subtext' => 'Redis Memory Usage'];
             }
@@ -212,7 +213,7 @@ switch ($action) {
         break;
 
     case 'get_nav_items':
-        $userRole = $_SESSION['nubuilder_session_data']['sal_code'] ?? $_SESSION['user_role'] ?? 'Admin';
+        $userRole = isset($_SESSION['nubuilder_session_data']['sal_code']) ? $_SESSION['nubuilder_session_data']['sal_code'] : (isset($_SESSION['user_role']) ? $_SESSION['user_role'] : 'Admin');
 
         $cacheKey = "menu:user:{$userId}:{$userRole}";
         $cachedNav = $cache->get($cacheKey);

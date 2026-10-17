@@ -1,6 +1,7 @@
 <?php
 /**
  * Action: Redis Diagnostics & Cache Management API Handler (AJAX) for BIS_DEV
+ * Compatible with PHP 7.3+
  */
 
 // Buffer all output to prevent PHP notices, warnings, or DB error messages from corrupting JSON response
@@ -18,7 +19,7 @@ if (file_exists(__DIR__ . '/../nuconfig.php')) {
 require_once __DIR__ . '/../core/Cache.php';
 
 // Helper function to send clean JSON response
-function sendJsonResponse(array $data, int $statusCode = 200): void {
+function sendJsonResponse(array $data, int $statusCode = 200) {
     if (ob_get_length()) {
         ob_end_clean();
     }
@@ -34,7 +35,7 @@ try {
         @session_start();
     }
 
-    $sessionData  = $_SESSION['nubuilder_session_data'] ?? [];
+    $sessionData  = isset($_SESSION['nubuilder_session_data']) ? $_SESSION['nubuilder_session_data'] : [];
     $isGlobeAdmin = !empty($sessionData['isGlobeadmin']);
     $isAuthUser   = !empty($sessionData['SESSION_ID'])
                  || !empty($sessionData['user_id'])
@@ -45,13 +46,14 @@ try {
         sendJsonResponse(['success' => false, 'error' => 'Access denied: Globeadmin or authenticated session required'], 403);
     }
 
-    $jsonInput = json_decode(file_get_contents('php://input'), true) ?? [];
-    $action = $_GET['action'] ?? ($jsonInput['action'] ?? ($_POST['action'] ?? ''));
+    $rawPayload = file_get_contents('php://input');
+    $jsonInput = $rawPayload ? json_decode($rawPayload, true) : [];
+    $action = isset($_GET['action']) ? $_GET['action'] : (isset($jsonInput['action']) ? $jsonInput['action'] : (isset($_POST['action']) ? $_POST['action'] : ''));
 
     $cache = \NuCache::getInstance();
     global $nuConfigRedis;
-    $cfg = $nuConfigRedis ?? [];
-    $socketPath = $cfg['path'] ?? ((getenv('HOME') ?: '') . '/.redis/redis.sock');
+    $cfg = isset($nuConfigRedis) ? $nuConfigRedis : [];
+    $socketPath = isset($cfg['path']) ? $cfg['path'] : ((getenv('HOME') ?: '') . '/.redis/redis.sock');
     $socketExists = file_exists($socketPath);
 
     if ($action === 'get_redis_status') {
@@ -74,16 +76,16 @@ try {
         if ($isConnected && $client) {
             try {
                 $info = $client->info();
-                $redisVersion = $info['redis_version'] ?? 'Unknown';
-                $usedMemory = $info['used_memory_human'] ?? 'Unknown';
-                $connectedClients = (int)($info['connected_clients'] ?? 1);
+                $redisVersion = isset($info['redis_version']) ? $info['redis_version'] : 'Unknown';
+                $usedMemory = isset($info['used_memory_human']) ? $info['used_memory_human'] : 'Unknown';
+                $connectedClients = (int)(isset($info['connected_clients']) ? $info['connected_clients'] : 1);
 
-                $prefix = $cfg['prefix'] ?? 'nuvis:';
+                $prefix = isset($cfg['prefix']) ? $cfg['prefix'] : 'nuvis:';
                 $allKeys = $client->keys($prefix . '*');
 
                 if (is_array($allKeys)) {
                     $cachedKeysCount = count($allKeys);
-                    $sessionKeys = array_filter($allKeys, fn($k) => str_contains($k, 'sess:'));
+                    $sessionKeys = array_filter($allKeys, function($k) { return strpos($k, 'sess:') !== false; });
                     $activeSessionsCount = count($sessionKeys);
 
                     foreach (array_slice($allKeys, 0, 15) as $k) {
@@ -106,7 +108,7 @@ try {
             'redis_extension' => extension_loaded('redis'),
             'config_enabled' => !empty($cfg['enabled']),
             'is_connected' => $isConnected,
-            'scheme' => $cfg['scheme'] ?? 'unix',
+            'scheme' => isset($cfg['scheme']) ? $cfg['scheme'] : 'unix',
             'socket_path' => $socketPath,
             'socket_exists' => $socketExists,
             'redis_version' => $redisVersion,
@@ -167,7 +169,7 @@ try {
             'success' => true,
             'socket_exists' => $exists,
             'is_connected' => $isConnected,
-            'message' => 'Created ~/.redis.on flag on disk. A2 Hosting background process will initialize the Redis daemon.'
+            'message' => 'Created ~/.redis.on flag on disk. Background process will initialize the Redis daemon.'
         ]);
     }
 
