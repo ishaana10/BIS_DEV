@@ -1146,10 +1146,14 @@ function nuGetLookupFields(id) {
 
 function nuObjectComponents(i) {
 
+	if (!i || typeof i !== 'string' || i.trim() === '' || i === '#') {
+		return [];
+	}
+
 	let o = [i, 'label_' + i];
 	const obj = $('#' + i);
-	if (obj.attr('data-nu-type') == 'lookup') o.push(i + 'code', i + 'button', i + 'description')
-	if (obj.hasClass('select2-hidden-accessible')) o.push(i + '_select2');
+	if (obj.length && obj.attr('data-nu-type') == 'lookup') o.push(i + 'code', i + 'button', i + 'description');
+	if (obj.length && obj.hasClass('select2-hidden-accessible')) o.push(i + '_select2');
 
 	return o;
 
@@ -1167,11 +1171,12 @@ function nuEnable(i, enable) {
 	$.each(ids, function(index) {
 
 		const id = ids[index];
+		if (!id || id === '') return;
 		const components = nuObjectComponents(id);
 
 		for (let c = 0; c < components.length; c++) {
 
-			if (c === 1) {
+			if (c === 1 || !components[c]) {
 				continue;
 			} // skip label
 
@@ -1198,10 +1203,11 @@ function nuDisable(i) { //-- Disable Edit Form Object
 
 	$.each(ids, function(index) {
 		const id = ids[index];
+		if (!id || id === '') return;
 		const components = nuObjectComponents(id);
 
 		for (let c = 0; c < components.length; c++) {
-			if (c === 1) {
+			if (c === 1 || !components[c]) {
 				continue;
 			} // skip label
 
@@ -1221,10 +1227,11 @@ function nuDisable(i) { //-- Disable Edit Form Object
 
 function nuReadonly(i) {
 
+	if (!i || i === '') return;
 	const o = nuObjectComponents(i);
 
 	o.forEach((component, index) => {
-		if (index === 1) return; 		// Skip label
+		if (index === 1 || !component) return; 		// Skip label
 		$('#' + component)
 			.addClass('nuReadonly')
 			.attr('onclick', "return false")
@@ -1253,6 +1260,7 @@ function nuShow(i, visible, openTab) {
 
 			for (var c = 0; c < o.length; c++) {
 
+				if (!o[c] || o[c] === '') continue;
 				var t = String($('#' + o[c]).attr('data-nu-tab'));
 
 				if (nuIsHidden(o[c])) {
@@ -1295,6 +1303,7 @@ function nuHide(i) {
 
 		for (var c = 0; c < o.length; c++) {
 
+			if (!o[c] || o[c] === '') continue;
 			var t = String($('#' + o[c]).attr('data-nu-tab'));
 
 			if (t[0] == 'x') {
@@ -1332,19 +1341,23 @@ function nuRemove(i) {
 }
 
 function nuIsVisible(i) {
+	if (!i || i === '') return false;
 	return $('#' + i).is(':visible');
 }
 
 function nuIsHidden(i) {
+	if (!i || i === '') return true;
 	return !$('#' + i).is(':visible');
 }
 
 function nuIsEnabled(i) {
+	if (!i || i === '') return false;
 	let o = $('#' + i);
 	return !o.is(':disabled') && !o.hasClass('nuReadonly');
 }
 
 function nuIsDisabled(i) {
+	if (!i || i === '') return true;
 	let o = $('#' + i);
 	return o.is(':disabled') || o.hasClass('nuReadonly');
 }
