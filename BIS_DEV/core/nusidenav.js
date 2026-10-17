@@ -8,30 +8,29 @@ window.nuSideNav = {
     items: [],
 
     init: function() {
-        if ($('#nu-sidenav-drawer').length === 0) {
-            this.injectHTML();
-        }
         this.checkVisibility();
     },
 
     isUserLoggedIn: function() {
-        // Detect login screen components in nuBuilder
-        var isLoginPage = $('#nuLoginForm').length > 0 ||
-                          $('#nuusername').length > 0 ||
-                          $('#nupassword').length > 0 ||
-                          $('.nuLogin').length > 0 ||
-                          $('#login').length > 0;
+        var isLoginFormVisible = $('#nuLoginForm').length > 0 && $('#nuLoginForm').is(':visible');
+        if (isLoginFormVisible) return false;
 
-        var hasActiveSession = window.nuSESSION && window.nuSESSION !== '';
+        var isUsernameVisible = $('#nuusername').length > 0 && $('#nuusername').is(':visible');
+        if (isUsernameVisible) return false;
+
+        var hasActiveSession = typeof window.nuSESSION !== 'undefined' && window.nuSESSION !== '';
         var hasLoadedForms = $('#nuRECORD').length > 0 || $('#nuBreadcrumbHolder').length > 0 || $('#nuTabHolder').length > 0;
 
-        return (hasActiveSession || hasLoadedForms) && !isLoginPage;
+        return (hasActiveSession || hasLoadedForms);
     },
 
     checkVisibility: function() {
         var loggedIn = this.isUserLoggedIn();
 
         if (loggedIn) {
+            if ($('#nu-sidenav-drawer').length === 0) {
+                this.injectHTML();
+            }
             $('#nu-sidenav-toggle-btn').css('display', 'inline-flex');
             if (this.items.length === 0) {
                 this.loadNavItems();
@@ -39,6 +38,10 @@ window.nuSideNav = {
         } else {
             $('#nu-sidenav-toggle-btn').css('display', 'none');
             this.close();
+            if ($('#nu-sidenav-drawer').length > 0) {
+                $('#nu-sidenav-toggle-btn, #nu-sidenav-overlay, #nu-sidenav-drawer').remove();
+            }
+            this.items = [];
         }
     },
 
