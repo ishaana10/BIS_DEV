@@ -3,6 +3,12 @@
  * Action: Redis Diagnostics & Cache Management API Handler (AJAX) for BIS_DEV
  */
 
+// Buffer all output to prevent PHP notices, warnings, or DB error messages from corrupting JSON response
+ob_start();
+
+ini_set('display_errors', '0');
+error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING & ~E_DEPRECATED);
+
 if (file_exists(__DIR__ . '/../nuconfig.php')) {
     require_once __DIR__ . '/../nuconfig.php';
 } else {
@@ -11,39 +17,37 @@ if (file_exists(__DIR__ . '/../nuconfig.php')) {
 
 require_once __DIR__ . '/../core/Cache.php';
 
-header('Content-Type: application/json');
-
-// Session authorization check for BIS_DEV
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-$sessionData  = $_SESSION['nubuilder_session_data'] ?? [];
-$isGlobeAdmin = !empty($sessionData['isGlobeadmin']);
-$isAuthUser   = !empty($sessionData['SESSION_ID']) || !empty($sessionData['user_id']) || !empty($_SESSION['authenticated']);
-
-// Check if user is logged in via standard cookie session if session array not hydrated
-if (!$isGlobeAdmin && !$isAuthUser) {
-    $cookieSession = $_COOKIE['nu_session_id'] ?? ($_COOKIE['nu_' . ($nuConfigDBName ?? '')] ?? null);
-    if (!empty($cookieSession) && file_exists(__DIR__ . '/../core/nudatabase.php')) {
-        require_once __DIR__ . '/../core/nudatabase.php';
-        $t = @nuRunQuery("SELECT sss_access FROM zzzzsys_session WHERE zzzzsys_session_id = ?", [$cookieSession]);
-        if ($t && @db_num_rows($t) > 0) {
-            $isAuthUser = true;
-        }
+// Helper function to send clean JSON response
+function sendJsonResponse(array $data, int $statusCode = 200): void {
+    if (ob_get_length()) {
+        ob_end_clean();
     }
-}
-
-if (!$isGlobeAdmin && !$isAuthUser) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'error' => 'Access denied: Globeadmin or authenticated session required']);
+    http_response_code($statusCode);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($data);
     exit();
 }
 
-$jsonInput = json_decode(file_get_contents('php://input'), true) ?? [];
-$action = $_GET['action'] ?? ($jsonInput['action'] ?? ($_POST['action'] ?? ''));
-
 try {
+    // Session authorization check for BIS_DEV
+    if (session_status() === PHP_SESSION_NONE) {
+        @session_start();
+    }
+
+    $sessionData  = $_SESSION['nubuilder_session_data'] ?? [];
+    $isGlobeAdmin = !empty($sessionData['isGlobeadmin']);
+    $isAuthUser   = !empty($sessionData['SESSION_ID'])
+                 || !empty($sessionData['user_id'])
+                 || !empty($_SESSION['authenticated'])
+                 || !empty($sessionData);
+
+    if (!$isGlobeAdmin && !$isAuthUser) {
+        sendJsonResponse(['success' => false, 'error' => 'Access denied: Globeadmin or authenticated session required'], 403);
+    }
+
+    $jsonInput = json_decode(file_get_contents('php://input'), true) ?? [];
+    $action = $_GET['action'] ?? ($jsonInput['action'] ?? ($_POST['action'] ?? ''));
+
     $cache = \NuCache::getInstance();
     global $nuConfigRedis;
     $cfg = $nuConfigRedis ?? [];
@@ -97,7 +101,7 @@ try {
             }
         }
 
-        echo json_encode([
+        sendJsonResponse([
             'success' => true,
             'redis_extension' => extension_loaded('redis'),
             'config_enabled' => !empty($cfg['enabled']),
@@ -113,16 +117,14 @@ try {
             'keys_sample' => $keysList,
             'timestamp' => date('Y-m-d H:i:s')
         ]);
-        exit();
     }
 
     if ($action === 'test_redis_ping') {
         if (!$cache->isEnabled()) {
-            echo json_encode([
+            sendJsonResponse([
                 'success' => false,
                 'error' => 'Redis is not connected or daemon is offline.'
             ]);
-            exit();
         }
 
         $start = microtime(true);
@@ -136,18 +138,17 @@ try {
         $latencyMs = round((microtime(true) - $start) * 1000, 2);
 
         if ($retrieved === $testVal) {
-            echo json_encode([
+            sendJsonResponse([
                 'success' => true,
                 'latency_ms' => $latencyMs,
                 'message' => "SET/GET/DEL benchmark completed in {$latencyMs} ms. Cache reads and writes are 100% operational!"
             ]);
         } else {
-            echo json_encode([
+            sendJsonResponse([
                 'success' => false,
                 'error' => 'Benchmark read mismatch or key storage failure.'
             ]);
         }
-        exit();
     }
 
     if ($action === 'start_redis_daemon') {
@@ -162,25 +163,23 @@ try {
         $exists = file_exists($socketPath);
         $isConnected = $cache->isEnabled();
 
-        echo json_encode([
+        sendJsonResponse([
             'success' => true,
             'socket_exists' => $exists,
             'is_connected' => $isConnected,
             'message' => 'Created ~/.redis.on flag on disk. A2 Hosting background process will initialize the Redis daemon.'
         ]);
-        exit();
     }
 
     if ($action === 'flush_cache') {
         $flushed = $cache->flush();
-        echo json_encode([
+        sendJsonResponse([
             'success' => $flushed,
             'message' => $flushed ? 'All application cache keys under prefix successfully flushed.' : 'Cache flush attempted.'
         ]);
-        exit();
     }
 
-    echo json_encode(['success' => false, 'error' => 'Invalid action specified']);
+    sendJsonResponse(['success' => false, 'error' => 'Invalid action specified']);
 } catch (\Throwable $e) {
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    sendJsonResponse(['success' => false, 'error' => $e->getMessage()], 500);
 }
