@@ -1,23 +1,22 @@
 <?php
-declare(strict_types=1);
 
 /**
  * NuCache - Simple Redis-backed cache with graceful fallback
- * Uses native phpredis extension
+ * Compatible with PHP 7.3+
  */
 class NuCache
 {
-    private static ?self $instance = null;
-    private ?\Redis $redis = null;
-    private bool $enabled = false;
-    private string $prefix = 'nuvis:';
-    private int $defaultTtl = 300;
+    private static $instance = null;
+    private $redis = null;
+    private $enabled = false;
+    private $prefix = 'nuvis:';
+    private $defaultTtl = 300;
 
     private function __construct()
     {
         global $nuConfigRedis, $nuConfig;
 
-        $cfg = $nuConfigRedis ?? ($nuConfig['redis'] ?? []);
+        $cfg = isset($nuConfigRedis) ? $nuConfigRedis : (isset($nuConfig['redis']) ? $nuConfig['redis'] : []);
 
         if (empty($cfg['enabled'])) {
             return;
@@ -31,8 +30,11 @@ class NuCache
         try {
             $this->redis = new \Redis();
 
-            if (($cfg['scheme'] ?? 'unix') === 'unix') {
-                $socketPath = $cfg['path'] ?? ((getenv('HOME') ?: '') . '/.redis/redis.sock');
+            $scheme = isset($cfg['scheme']) ? $cfg['scheme'] : 'unix';
+            $timeout = isset($cfg['timeout']) ? (float)$cfg['timeout'] : 2.5;
+
+            if ($scheme === 'unix') {
+                $socketPath = isset($cfg['path']) ? $cfg['path'] : ((getenv('HOME') ?: '') . '/.redis/redis.sock');
                 if (!file_exists($socketPath)) {
                     $homeDir = getenv('HOME');
                     if ($homeDir) {
@@ -46,13 +48,15 @@ class NuCache
                 $connected = $this->redis->connect(
                     $socketPath,
                     0,
-                    (float)($cfg['timeout'] ?? 2.5)
+                    $timeout
                 );
             } else {
+                $host = isset($cfg['host']) ? $cfg['host'] : '127.0.0.1';
+                $port = isset($cfg['port']) ? (int)$cfg['port'] : 6379;
                 $connected = $this->redis->connect(
-                    $cfg['host'] ?? '127.0.0.1',
-                    (int)($cfg['port'] ?? 6379),
-                    (float)($cfg['timeout'] ?? 2.5)
+                    $host,
+                    $port,
+                    $timeout
                 );
             }
 
@@ -64,9 +68,10 @@ class NuCache
                 $this->redis->auth($cfg['password']);
             }
 
-            $this->redis->select((int)($cfg['database'] ?? 0));
-            $this->prefix     = (string)($cfg['prefix'] ?? 'nuvis:');
-            $this->defaultTtl = (int)($cfg['default_ttl'] ?? 300);
+            $database = isset($cfg['database']) ? (int)$cfg['database'] : 0;
+            $this->redis->select($database);
+            $this->prefix     = isset($cfg['prefix']) ? (string)$cfg['prefix'] : 'nuvis:';
+            $this->defaultTtl = isset($cfg['default_ttl']) ? (int)$cfg['default_ttl'] : 300;
             $this->enabled    = true;
 
         } catch (\Throwable $e) {
@@ -76,7 +81,7 @@ class NuCache
         }
     }
 
-    public static function getInstance(): self
+    public static function getInstance()
     {
         if (self::$instance === null) {
             self::$instance = new self();
@@ -84,22 +89,22 @@ class NuCache
         return self::$instance;
     }
 
-    public static function resetInstance(): void
+    public static function resetInstance()
     {
         self::$instance = null;
     }
 
-    public function isEnabled(): bool
+    public function isEnabled()
     {
         return $this->enabled && $this->redis !== null;
     }
 
-    private function key(string $key): string
+    private function key($key)
     {
         return $this->prefix . $key;
     }
 
-    public function get(string $key, mixed $default = null): mixed
+    public function get($key, $default = null)
     {
         if (!$this->isEnabled()) {
             return $default;
@@ -111,7 +116,7 @@ class NuCache
                 return $default;
             }
             $decoded = @unserialize($value, ['allowed_classes' => ['stdClass']]);
-            return $decoded === false && $value !== serialize(false)
+            return ($decoded === false && $value !== serialize(false))
                 ? $value
                 : $decoded;
         } catch (\Throwable $e) {
@@ -120,14 +125,14 @@ class NuCache
         }
     }
 
-    public function set(string $key, mixed $value, ?int $ttl = null): bool
+    public function set($key, $value, $ttl = null)
     {
         if (!$this->isEnabled()) {
             return false;
         }
 
         try {
-            $ttl = $ttl ?? $this->defaultTtl;
+            $ttl = $ttl !== null ? $ttl : $this->defaultTtl;
             $payload = serialize($value);
             if ($ttl > 0) {
                 return $this->redis->setex($this->key($key), $ttl, $payload);
@@ -139,7 +144,7 @@ class NuCache
         }
     }
 
-    public function delete(string $key): bool
+    public function delete($key)
     {
         if (!$this->isEnabled()) {
             return false;
@@ -152,7 +157,7 @@ class NuCache
     }
 
     /** Delete multiple keys by pattern (use carefully) */
-    public function deleteByPattern(string $pattern): int
+    public function deleteByPattern($pattern)
     {
         if (!$this->isEnabled()) {
             return 0;
@@ -162,33 +167,32 @@ class NuCache
             if (empty($keys)) {
                 return 0;
             }
-            return (int)$this->redis->del(...$keys);
+            return (int)$this->redis->del($keys);
         } catch (\Throwable $e) {
             return 0;
         }
     }
 
-    public function remember(string $key, callable $callback, ?int $ttl = null): mixed
+    public function remember($key, $callback, $ttl = null)
     {
         $value = $this->get($key);
         if ($value !== null) {
             return $value;
         }
-        $value = $callback();
+        $value = call_user_func($callback);
         $this->set($key, $value, $ttl);
         return $value;
     }
 
-    public function flush(): bool
+    public function flush()
     {
         if (!$this->isEnabled()) {
             return false;
         }
         try {
-            // Only flush keys with our prefix for safety
             $keys = $this->redis->keys($this->prefix . '*');
             if (!empty($keys)) {
-                $this->redis->del(...$keys);
+                $this->redis->del($keys);
             }
             return true;
         } catch (\Throwable $e) {
@@ -197,30 +201,30 @@ class NuCache
     }
 
     /** Expose native Redis for advanced use */
-    public function client(): ?\Redis
+    public function client()
     {
         return $this->isEnabled() ? $this->redis : null;
     }
 
     // ─── Invalidation Helpers ──────────────────────────────────────────────────
 
-    public function invalidateForm(string $formId): void
+    public function invalidateForm($formId)
     {
         $this->delete("form:meta:{$formId}");
         $this->deleteByPattern("menu:*");
     }
 
-    public function invalidateSystemSettings(): void
+    public function invalidateSystemSettings()
     {
         $this->deleteByPattern("sys:*");
     }
 
-    public function invalidateUserMenu(string|int $userId): void
+    public function invalidateUserMenu($userId)
     {
         $this->deleteByPattern("menu:user:{$userId}:*");
     }
 
-    public function invalidateMenus(): void
+    public function invalidateMenus()
     {
         $this->deleteByPattern("menu:*");
     }

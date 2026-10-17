@@ -1,30 +1,29 @@
 <?php
-declare(strict_types=1);
 
 class NuRedisSessionHandler implements SessionHandlerInterface
 {
-    private \Redis $redis;
-    private string $prefix;
-    private int $ttl;
+    private $redis;
+    private $prefix;
+    private $ttl;
 
-    public function __construct(\Redis $redis, string $prefix = 'nuvis:sess:', int $ttl = 1800)
+    public function __construct($redis, $prefix = 'nuvis:sess:', $ttl = 1800)
     {
         $this->redis  = $redis;
         $this->prefix = $prefix;
-        $this->ttl    = $ttl > 0 ? $ttl : 1800;
+        $this->ttl    = $ttl > 0 ? (int)$ttl : 1800;
     }
 
-    public function open(string $path, string $name): bool
+    public function open($path, $name)
     {
         return true;
     }
 
-    public function close(): bool
+    public function close()
     {
         return true;
     }
 
-    public function read(string $id): string|false
+    public function read($id)
     {
         try {
             $data = $this->redis->get($this->prefix . $id);
@@ -35,7 +34,7 @@ class NuRedisSessionHandler implements SessionHandlerInterface
         }
     }
 
-    public function write(string $id, string $data): bool
+    public function write($id, $data)
     {
         try {
             return (bool)$this->redis->setex($this->prefix . $id, $this->ttl, $data);
@@ -45,7 +44,7 @@ class NuRedisSessionHandler implements SessionHandlerInterface
         }
     }
 
-    public function destroy(string $id): bool
+    public function destroy($id)
     {
         try {
             return (bool)$this->redis->del($this->prefix . $id);
@@ -55,7 +54,7 @@ class NuRedisSessionHandler implements SessionHandlerInterface
         }
     }
 
-    public function gc(int $max_lifetime): int|false
+    public function gc($max_lifetime)
     {
         return 0;
     }
