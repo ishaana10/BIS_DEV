@@ -211,6 +211,29 @@ switch ($action) {
         sendDashboardJson(['status' => 'success', 'data' => $data, 'cached' => false]);
         break;
 
+    case 'get_nav_items':
+        $userRole = $_SESSION['nubuilder_session_data']['sal_group'] ?? $_SESSION['user_role'] ?? 'Admin';
+
+        $cacheKey = "menu:user:{$userId}:{$userRole}";
+        $cachedNav = $cache->get($cacheKey);
+        if ($cachedNav) {
+            sendDashboardJson(['status' => 'success', 'items' => $cachedNav, 'cached' => true]);
+        }
+
+        $navItems = [
+            ['id' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'fa-dashboard', 'action' => 'nuOpenDashboard()'],
+            ['id' => 'setup', 'label' => 'System Setup', 'icon' => 'fa-cog', 'action' => 'nuOpenSetup()'],
+            ['id' => 'forms', 'label' => 'Form Builder', 'icon' => 'fa-file-text-o', 'action' => "nuSelectForm('nuform')"],
+            ['id' => 'users', 'label' => 'User Management', 'icon' => 'fa-users', 'action' => "nuSelectForm('nuuser')"],
+            ['id' => 'reports', 'label' => 'Report Designer', 'icon' => 'fa-bar-chart', 'action' => "nuSelectForm('nureport')"],
+            ['id' => 'objects', 'label' => 'Object Builder', 'icon' => 'fa-cube', 'action' => "nuSelectForm('nuobject')"],
+            ['id' => 'redis', 'label' => 'Redis Diagnostics', 'icon' => 'fa-database', 'action' => 'nuOpenSetup()']
+        ];
+
+        $cache->set($cacheKey, $navItems, 600);
+        sendDashboardJson(['status' => 'success', 'items' => $navItems, 'cached' => false]);
+        break;
+
     default:
         sendDashboardJson(['status' => 'error', 'message' => 'Unknown dashboard action']);
 }

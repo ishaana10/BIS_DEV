@@ -115,6 +115,7 @@ nuJSIndexInclude('core/nuformdrag.js');
 nuJSIndexInclude('core/nucalendar.js');
 nuJSIndexInclude('core/nucommon.js');
 nuJSIndexInclude('core/nudashboard.js');
+nuJSIndexInclude('core/nusidenav.js');
 nuJSIndexInclude('core/nuadmin.js');
 nuJSIndexInclude('core/nureportjson.js');
 nuJSIndexInclude('core/nuajax.js');

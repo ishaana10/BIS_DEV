@@ -1,5 +1,6 @@
 /**
- * Low-Code Customizable Dashboard & Lazy Loading Widget Engine for nuBuilder
+ * Industrial Aesthetic Low-Code Dynamic Dashboard & Lazy-Loading Widget Engine for nuBuilder
+ * Data loading is fully procedure-driven asynchronously so page rendering is never blocked.
  */
 
 window.nuDashboard = {
@@ -18,55 +19,62 @@ window.nuDashboard = {
     injectContainers: function() {
         var html = [
             '<style>',
-            '#nu-dashboard-view { padding: 20px; font-family: sans-serif; background: #f8fafc; min-height: 80vh; display: none; }',
-            '.nu-dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; }',
-            '.nu-dash-title { font-size: 22px; font-weight: 700; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 10px; }',
-            '.nu-dash-actions { display: flex; gap: 10px; }',
-            '.nu-dash-btn { background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; transition: all 0.2s; }',
-            '.nu-dash-btn:hover { background: #2563eb; }',
-            '.nu-dash-btn-secondary { background: #64748b; }',
+            '#nu-dashboard-view { padding: 24px; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; min-height: 85vh; display: none; }',
+            '.nu-dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 2px solid #334155; padding-bottom: 16px; }',
+            '.nu-dash-title { font-size: 24px; font-weight: 800; color: #f8fafc; margin: 0; display: flex; align-items: center; gap: 12px; letter-spacing: -0.5px; }',
+            '.nu-dash-title i { color: #38bdf8; text-shadow: 0 0 10px rgba(56, 189, 248, 0.4); }',
+            '.nu-dash-subtitle { font-size: 12px; color: #94a3b8; font-weight: 400; margin-top: 4px; font-family: monospace; }',
+            '.nu-dash-actions { display: flex; gap: 12px; }',
+            '.nu-dash-btn { background: #0284c7; color: white; border: 1px solid #38bdf8; padding: 9px 18px; border-radius: 6px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }',
+            '.nu-dash-btn:hover { background: #0369a1; transform: translateY(-1px); }',
+            '.nu-dash-btn-secondary { background: #334155; border-color: #64748b; color: #e2e8f0; }',
             '.nu-dash-btn-secondary:hover { background: #475569; }',
-            '.nu-dash-btn-success { background: #10b981; }',
-            '.nu-dash-btn-success:hover { background: #059669; }',
-            '.nu-dash-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }',
-            '.nu-widget-card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); padding: 16px; min-height: 120px; position: relative; transition: transform 0.2s, box-shadow 0.2s; }',
-            '.nu-widget-card:hover { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }',
-            '.nu-widget-card.editing { border: 2px dashed #3b82f6; background: #eff6ff; }',
+            '.nu-dash-btn-success { background: #059669; border-color: #34d399; }',
+            '.nu-dash-btn-success:hover { background: #047857; }',
+            '.nu-dash-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 20px; }',
+            '.nu-widget-card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.25); padding: 20px; min-height: 130px; position: relative; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; }',
+            '.nu-widget-card:hover { border-color: #38bdf8; box-shadow: 0 8px 20px rgba(0,0,0,0.4); }',
+            '.nu-widget-card.editing { border: 2px dashed #38bdf8; background: #0f172a; }',
             '.col-3 { grid-column: span 3; }',
             '.col-4 { grid-column: span 4; }',
             '.col-6 { grid-column: span 6; }',
             '.col-8 { grid-column: span 8; }',
             '.col-12 { grid-column: span 12; }',
             '@media (max-width: 900px) { .col-3, .col-4, .col-6, .col-8 { grid-column: span 12; } }',
-            '.nu-widget-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }',
-            '.nu-widget-title { font-size: 14px; font-weight: 600; color: #475569; margin: 0; text-transform: uppercase; letter-spacing: 0.5px; }',
-            '.nu-widget-remove { color: #ef4444; cursor: pointer; font-size: 16px; display: none; }',
+            '.nu-widget-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid #334155; padding-bottom: 8px; }',
+            '.nu-widget-title { font-size: 12px; font-weight: 700; color: #94a3b8; margin: 0; text-transform: uppercase; letter-spacing: 1px; font-family: monospace; }',
+            '.nu-widget-remove { color: #f87171; cursor: pointer; font-size: 16px; display: none; transition: color 0.2s; }',
+            '.nu-widget-remove:hover { color: #ef4444; }',
             '.editing .nu-widget-remove { display: inline-block; }',
-            '.nu-widget-body { position: relative; min-height: 60px; }',
-            '.nu-kpi-val { font-size: 28px; font-weight: 800; color: #0f172a; line-height: 1.1; margin-top: 4px; }',
-            '.nu-kpi-sub { font-size: 12px; color: #64748b; margin-top: 4px; }',
-            '.nu-kpi-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; float: right; background: #dcfce7; color: #15803d; }',
-            '.nu-loading-spinner { display: flex; align-items: center; justify-content: center; height: 80px; color: #94a3b8; font-size: 13px; gap: 8px; }',
-            '.nu-chart-bar-container { display: flex; align-items: flex-end; gap: 12px; height: 140px; padding-top: 10px; border-bottom: 1px solid #e2e8f0; }',
-            '.nu-chart-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }',
-            '.nu-chart-bar { width: 100%; max-width: 30px; background: #3b82f6; border-radius: 4px 4px 0 0; transition: height 0.5s ease; min-height: 4px; }',
-            '.nu-chart-label { font-size: 11px; color: #64748b; margin-top: 6px; }',
-            '.nu-table-widget { width: 100%; border-collapse: collapse; font-size: 13px; }',
-            '.nu-table-widget th { text-align: left; padding: 8px; background: #f8fafc; color: #475569; font-weight: 600; border-bottom: 1px solid #e2e8f0; }',
-            '.nu-table-widget td { padding: 8px; border-bottom: 1px solid #f1f5f9; color: #1e293b; }',
-            '.nu-shortcut-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }',
-            '.nu-shortcut-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center; cursor: pointer; transition: all 0.2s; text-decoration: none; color: #334155; font-weight: 600; font-size: 12px; }',
-            '.nu-shortcut-item:hover { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }',
-            '.nu-modal-backdrop { position: fixed; top: 0; left: 0; right:0; bottom:0; background: rgba(0,0,0,0.5); z-index: 9999; display: none; align-items: center; justify-content: center; }',
-            '.nu-modal-box { background: white; padding: 24px; border-radius: 8px; width: 450px; max-width: 90%; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }',
-            '.nu-modal-box h3 { margin-top: 0; margin-bottom: 16px; color: #0f172a; }',
-            '.nu-form-group { margin-bottom: 14px; }',
-            '.nu-form-group label { display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px; }',
-            '.nu-form-group input, .nu-form-group select { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; box-sizing: border-box; }',
+            '.nu-widget-body { position: relative; min-height: 70px; }',
+            '.nu-kpi-val { font-size: 32px; font-weight: 900; color: #f8fafc; line-height: 1; margin-top: 6px; font-family: "Courier New", monospace; letter-spacing: -1px; }',
+            '.nu-kpi-sub { font-size: 12px; color: #64748b; margin-top: 6px; font-weight: 500; }',
+            '.nu-kpi-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; float: right; background: #064e3b; color: #34d399; border: 1px solid #059669; font-family: monospace; }',
+            '.nu-loading-spinner { display: flex; align-items: center; justify-content: center; height: 90px; color: #64748b; font-size: 13px; gap: 10px; font-family: monospace; }',
+            '.nu-chart-bar-container { display: flex; align-items: flex-end; gap: 16px; height: 150px; padding-top: 16px; border-bottom: 1px solid #334155; }',
+            '.nu-chart-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }',
+            '.nu-chart-bar { width: 100%; max-width: 36px; background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%); border-radius: 4px 4px 0 0; transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1); min-height: 4px; box-shadow: 0 0 8px rgba(56, 189, 248, 0.3); }',
+            '.nu-chart-label { font-size: 11px; color: #94a3b8; font-family: monospace; }',
+            '.nu-table-widget { width: 100%; border-collapse: collapse; font-size: 13px; font-family: monospace; }',
+            '.nu-table-widget th { text-align: left; padding: 10px; background: #0f172a; color: #38bdf8; font-weight: 700; border-bottom: 2px solid #334155; }',
+            '.nu-table-widget td { padding: 10px; border-bottom: 1px solid #334155; color: #cbd5e1; }',
+            '.nu-shortcut-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }',
+            '.nu-shortcut-item { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 14px; text-align: center; cursor: pointer; transition: all 0.2s; text-decoration: none; color: #f8fafc; font-weight: 700; font-size: 12px; font-family: monospace; }',
+            '.nu-shortcut-item:hover { background: #1e293b; border-color: #38bdf8; color: #38bdf8; transform: translateY(-2px); }',
+            '.nu-modal-backdrop { position: fixed; top: 0; left: 0; right:0; bottom:0; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(4px); z-index: 9999; display: none; align-items: center; justify-content: center; }',
+            '.nu-modal-box { background: #1e293b; border: 1px solid #334155; padding: 28px; border-radius: 12px; width: 480px; max-width: 90%; box-shadow: 0 20px 40px rgba(0,0,0,0.6); color: #f8fafc; }',
+            '.nu-modal-box h3 { margin-top: 0; margin-bottom: 20px; color: #f8fafc; font-size: 18px; font-weight: 800; border-bottom: 1px solid #334155; padding-bottom: 10px; }',
+            '.nu-form-group { margin-bottom: 16px; }',
+            '.nu-form-group label { display: block; font-size: 12px; font-weight: 700; color: #94a3b8; margin-bottom: 6px; font-family: monospace; }',
+            '.nu-form-group input, .nu-form-group select { width: 100%; padding: 10px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; font-size: 13px; color: #f8fafc; box-sizing: border-box; font-family: inherit; }',
+            '.nu-form-group input:focus, .nu-form-group select:focus { outline: none; border-color: #38bdf8; }',
             '</style>',
             '<div id="nu-dashboard-view">',
             '  <div class="nu-dash-header">',
-            '    <h1 class="nu-dash-title"><i class="fa fa-dashboard" style="color:#3b82f6;"></i> Low-Code Dynamic Dashboard</h1>',
+            '    <div>',
+            '      <h1 class="nu-dash-title"><i class="fa fa-tachometer"></i> Industrial Operations Center</h1>',
+            '      <div class="nu-dash-subtitle">PROCEDURAL ASYNCHRONOUS DASHBOARD • ZERO BLOCKING RENDER</div>',
+            '    </div>',
             '    <div class="nu-dash-actions">',
             '      <button class="nu-dash-btn nu-dash-btn-secondary" id="btn-toggle-customize" onclick="nuDashboard.toggleCustomize()"><i class="fa fa-pencil"></i> Customize</button>',
             '      <button class="nu-dash-btn nu-dash-btn-success" id="btn-add-widget" style="display:none;" onclick="nuDashboard.showAddModal()"><i class="fa fa-plus"></i> Add Widget</button>',
@@ -77,40 +85,40 @@ window.nuDashboard = {
             '</div>',
             '<div class="nu-modal-backdrop" id="nu-widget-modal">',
             '  <div class="nu-modal-box">',
-            '    <h3>Add Custom Widget</h3>',
+            '    <h3><i class="fa fa-sliders" style="color:#38bdf8;"></i> Add Industrial Widget</h3>',
             '    <div class="nu-form-group">',
             '      <label>Widget Title</label>',
-            '      <input type="text" id="nu-new-widget-title" placeholder="e.g. Total Revenue">',
+            '      <input type="text" id="nu-new-widget-title" placeholder="e.g. Total Revenue / Operational Throughput">',
             '    </div>',
             '    <div class="nu-form-group">',
             '      <label>Widget Type</label>',
             '      <select id="nu-new-widget-type" onchange="nuDashboard.onWidgetTypeChange()">',
-            '        <option value="kpi">KPI Stat Card</option>',
-            '        <option value="chart">Activity Chart</option>',
-            '        <option value="table">Recent Data Table</option>',
-            '        <option value="shortcuts">Quick Action Shortcuts</option>',
+            '        <option value="kpi">KPI Metric Counter</option>',
+            '        <option value="chart">System Activity Histogram</option>',
+            '        <option value="table">Recent Operations Table</option>',
+            '        <option value="shortcuts">Quick Command Grid</option>',
             '      </select>',
             '    </div>',
             '    <div class="nu-form-group" id="group-kpi-metric">',
-            '      <label>KPI Metric Source</label>',
+            '      <label>KPI Metric Procedure Source</label>',
             '      <select id="nu-new-widget-metric">',
             '        <option value="users">Active System Users</option>',
             '        <option value="forms">Configured System Forms</option>',
             '        <option value="objects">Total UI Objects</option>',
-            '        <option value="redis">Redis Memory Usage</option>',
+            '        <option value="redis">Redis Memory Footprint</option>',
             '      </select>',
             '    </div>',
             '    <div class="nu-form-group">',
-            '      <label>Card Width</label>',
+            '      <label>Grid Column Span</label>',
             '      <select id="nu-new-widget-width">',
-            '        <option value="col-3">1/4 Width (3 Columns)</option>',
-            '        <option value="col-4">1/3 Width (4 Columns)</option>',
+            '        <option value="col-3">Quarter Width (3 Columns)</option>',
+            '        <option value="col-4">Third Width (4 Columns)</option>',
             '        <option value="col-6">Half Width (6 Columns)</option>',
-            '        <option value="col-8">2/3 Width (8 Columns)</option>',
-            '        <option value="col-12">Full Width (12 Columns)</option>',
+            '        <option value="col-8">Two-Thirds Width (8 Columns)</option>',
+            '        <option value="col-12">Full Grid Span (12 Columns)</option>',
             '      </select>',
             '    </div>',
-            '    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">',
+            '    <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:24px;">',
             '      <button class="nu-dash-btn nu-dash-btn-secondary" onclick="nuDashboard.hideAddModal()">Cancel</button>',
             '      <button class="nu-dash-btn" onclick="nuDashboard.addCustomWidget()">Add Widget</button>',
             '    </div>',
@@ -172,7 +180,7 @@ window.nuDashboard = {
                 '    <i class="fa fa-trash nu-widget-remove" title="Remove Widget" onclick="nuDashboard.removeWidget(\'' + w.id + '\')"></i>',
                 '  </div>',
                 '  <div class="nu-widget-body">',
-                '    <div class="nu-loading-spinner"><i class="fa fa-circle-o-notch fa-spin"></i> Lazy loading...</div>',
+                '    <div class="nu-loading-spinner"><i class="fa fa-cog fa-spin"></i> FETCHING PROCEDURE DATA...</div>',
                 '  </div>',
                 '</div>'
             ].join('\n');
@@ -207,11 +215,11 @@ window.nuDashboard = {
                 if (res.status === 'success' && res.data) {
                     window.nuDashboard.renderWidgetContent($body, widgetType, res.data);
                 } else {
-                    $body.html('<p style="color:#ef4444; font-size:12px;">Failed to load data</p>');
+                    $body.html('<p style="color:#f87171; font-size:12px; font-family:monospace;">PROCEDURE EXECUTION FAILED</p>');
                 }
             },
             error: function() {
-                $body.html('<p style="color:#ef4444; font-size:12px;">Error connecting to dashboard server</p>');
+                $body.html('<p style="color:#f87171; font-size:12px; font-family:monospace;">PROCEDURE TIMEOUT / OFFLINE</p>');
             }
         });
     },
@@ -252,7 +260,7 @@ window.nuDashboard = {
             var gridHtml = '<div class="nu-shortcut-grid">';
             items.forEach(function(it) {
                 gridHtml += '<div class="nu-shortcut-item" onclick="' + (it.action || '') + '">';
-                gridHtml += '  <i class="fa ' + (it.icon || 'fa-star') + '" style="font-size:18px; margin-bottom:4px; display:block; color:#3b82f6;"></i>';
+                gridHtml += '  <i class="fa ' + (it.icon || 'fa-bolt') + '" style="font-size:20px; margin-bottom:6px; display:block; color:#38bdf8;"></i>';
                 gridHtml +=    it.title;
                 gridHtml += '</div>';
             });
@@ -292,7 +300,7 @@ window.nuDashboard = {
     },
 
     addCustomWidget: function() {
-        var title = $('#nu-new-widget-title').val() || 'Custom Widget';
+        var title = $('#nu-new-widget-title').val() || 'Industrial Widget';
         var type = $('#nu-new-widget-type').val();
         var metric = $('#nu-new-widget-metric').val();
         var width = $('#nu-new-widget-width').val();
@@ -329,10 +337,10 @@ window.nuDashboard = {
             dataType: 'json',
             success: function(res) {
                 if (res.status === 'success') {
-                    alert('Dashboard configuration saved successfully!');
+                    alert('Industrial Dashboard configuration saved successfully!');
                     self.toggleCustomize();
                 } else {
-                    alert('Failed to save dashboard: ' + (res.message || 'Unknown error'));
+                    alert('Failed to save layout: ' + (res.message || 'Unknown error'));
                 }
             }
         });
@@ -347,7 +355,7 @@ window.nuOpenDashboard = function() {
 
 $(document).ready(function() {
     if ($('#nu-dashboard-btn').length === 0 && $('#nuTabHolder').length > 0) {
-        var btn = '<button id="nu-dashboard-btn" class="nuTab nuDragNoSelect" onclick="nuOpenDashboard()" style="margin-left:8px; background:#3b82f6; color:white;"><i class="fa fa-dashboard"></i> Dashboard</button>';
+        var btn = '<button id="nu-dashboard-btn" class="nuTab nuDragNoSelect" onclick="nuOpenDashboard()" style="margin-left:8px; background:#0284c7; color:white; border:1px solid #38bdf8;"><i class="fa fa-dashboard"></i> Dashboard</button>';
         $('#nuTabHolder').append(btn);
     }
 });
