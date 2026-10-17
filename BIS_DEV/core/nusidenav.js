@@ -16,14 +16,22 @@ window.nuSideNav = {
     },
 
     checkVisibility: function() {
-        // Do NOT show menu button if on login screen or if tab holder is missing
-        var isLoginPage = $('#nuLoginHolder').length > 0 || $('#nuUsername').length > 0;
-        var isLoggedIn = ($('#nuTabHolder').length > 0 || (window.nuSESSION && window.nuSESSION !== '')) && !isLoginPage;
+        // Detect login screen components in nuBuilder
+        var isLoginPage = $('#nuLoginForm').length > 0 ||
+                          $('#nuusername').length > 0 ||
+                          $('#nupassword').length > 0 ||
+                          $('.nuLogin').length > 0 ||
+                          $('#login').length > 0;
+
+        var hasActiveSession = window.nuSESSION && window.nuSESSION !== '';
+        var hasLoadedForms = $('#nuRECORD').length > 0 || $('#nuBreadcrumbHolder').length > 0 || $('#nuTabHolder').length > 0;
+
+        var isLoggedIn = (hasActiveSession || hasLoadedForms) && !isLoginPage;
 
         if (isLoggedIn) {
-            $('#nu-sidenav-toggle-btn').show();
+            $('#nu-sidenav-toggle-btn').css('display', 'inline-flex');
         } else {
-            $('#nu-sidenav-toggle-btn').hide();
+            $('#nu-sidenav-toggle-btn').css('display', 'none');
             this.close();
         }
     },
@@ -31,7 +39,7 @@ window.nuSideNav = {
     injectHTML: function() {
         var html = [
             '<style>',
-            '#nu-sidenav-toggle-btn { position: fixed; top: 12px; left: 12px; z-index: 10000; background: #1e293b; color: #38bdf8; border: 1px solid #334155; border-radius: 6px; padding: 8px 12px; cursor: pointer; font-size: 14px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.2s; display: none; }',
+            '#nu-sidenav-toggle-btn { position: fixed; top: 12px; left: 12px; z-index: 10000; background: #1e293b; color: #38bdf8; border: 1px solid #334155; border-radius: 6px; padding: 8px 14px; cursor: pointer; font-size: 14px; font-weight: 700; font-family: "Segoe UI", sans-serif; box-shadow: 0 4px 8px rgba(0,0,0,0.4); transition: all 0.2s; display: none; align-items: center; gap: 8px; }',
             '#nu-sidenav-toggle-btn:hover { background: #0f172a; border-color: #38bdf8; transform: scale(1.05); }',
             '#nu-sidenav-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(2px); z-index: 9998; display: none; }',
             '#nu-sidenav-drawer { position: fixed; top: 0; left: -280px; width: 280px; bottom: 0; background: #0f172a; border-right: 1px solid #334155; z-index: 9999; transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; justify-content: space-between; padding: 20px; box-sizing: border-box; color: #f8fafc; font-family: "Segoe UI", sans-serif; box-shadow: 8px 0 24px rgba(0,0,0,0.5); }',
@@ -146,7 +154,11 @@ window.nuSideNav = {
 $(document).ready(function() {
     window.nuSideNav.init();
 
-    // Check visibility on AJAX complete or layout changes
+    // Check visibility on interval and AJAX complete
+    setInterval(function() {
+        window.nuSideNav.checkVisibility();
+    }, 300);
+
     $(document).ajaxComplete(function() {
         window.nuSideNav.checkVisibility();
     });
