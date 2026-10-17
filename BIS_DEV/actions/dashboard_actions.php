@@ -212,26 +212,67 @@ switch ($action) {
         break;
 
     case 'get_nav_items':
-        $userRole = $_SESSION['nubuilder_session_data']['sal_group'] ?? $_SESSION['user_role'] ?? 'Admin';
+        $userRole = $_SESSION['nubuilder_session_data']['sal_code'] ?? $_SESSION['user_role'] ?? 'Admin';
 
         $cacheKey = "menu:user:{$userId}:{$userRole}";
         $cachedNav = $cache->get($cacheKey);
         if ($cachedNav) {
-            sendDashboardJson(['status' => 'success', 'items' => $cachedNav, 'cached' => true]);
+            sendDashboardJson(['status' => 'success', 'role' => $userRole, 'items' => $cachedNav, 'cached' => true]);
         }
 
         $navItems = [
-            ['id' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'fa-dashboard', 'action' => 'nuOpenDashboard()'],
-            ['id' => 'setup', 'label' => 'System Setup', 'icon' => 'fa-cog', 'action' => 'nuOpenSetup()'],
-            ['id' => 'forms', 'label' => 'Form Builder', 'icon' => 'fa-file-text-o', 'action' => "nuSelectForm('nuform')"],
-            ['id' => 'users', 'label' => 'User Management', 'icon' => 'fa-users', 'action' => "nuSelectForm('nuuser')"],
-            ['id' => 'reports', 'label' => 'Report Designer', 'icon' => 'fa-bar-chart', 'action' => "nuSelectForm('nureport')"],
-            ['id' => 'objects', 'label' => 'Object Builder', 'icon' => 'fa-cube', 'action' => "nuSelectForm('nuobject')"],
-            ['id' => 'redis', 'label' => 'Redis Diagnostics', 'icon' => 'fa-database', 'action' => 'nuOpenSetup()']
+            ['id' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'fa-dashboard', 'action' => 'nuOpenDashboard()', 'is_home' => false]
         ];
 
+        if (function_exists('nuRunQuery')) {
+            // Get Assigned Home Form for Access Level
+            $homeFormId = null;
+            $homeSql = "SELECT sal_code, sal_zzzzsys_form_id FROM zzzzsys_user JOIN zzzzsys_access ON zzzzsys_access_id = sus_zzzzsys_access_id WHERE zzzzsys_user_id = ?";
+            $homeStmt = @nuRunQuery($homeSql, [$userId]);
+            if ($homeStmt && $rHome = db_fetch_object($homeStmt)) {
+                $homeFormId = $rHome->sal_zzzzsys_form_id;
+                if (!empty($rHome->sal_code)) { $userRole = $rHome->sal_code; }
+            }
+
+            if (!empty($homeFormId)) {
+                $fStmt = @nuRunQuery("SELECT sfo_code, sfo_description FROM zzzzsys_form WHERE zzzzsys_form_id = ?", [$homeFormId]);
+                if ($fStmt && $rF = db_fetch_object($fStmt)) {
+                    $navItems[] = [
+                        'id' => 'home_' . $homeFormId,
+                        'form_id' => $homeFormId,
+                        'label' => $rF->sfo_description ?: $rF->sfo_code,
+                        'icon' => 'fa-home',
+                        'is_home' => true
+                    ];
+                }
+            }
+
+            // Get All Accessible Forms assigned to User Access Level
+            $formsSql = "SELECT DISTINCT zzzzsys_form.zzzzsys_form_id, sfo_code, sfo_description FROM zzzzsys_user JOIN zzzzsys_access ON zzzzsys_access_id = sus_zzzzsys_access_id JOIN zzzzsys_access_form ON zzzzsys_access_id = slf_zzzzsys_access_id JOIN zzzzsys_form ON zzzzsys_form_id = slf_zzzzsys_form_id WHERE zzzzsys_user_id = ? ORDER BY sfo_description, sfo_code";
+            $formsStmt = @nuRunQuery($formsSql, [$userId]);
+            if ($formsStmt) {
+                while ($rForm = db_fetch_object($formsStmt)) {
+                    if ($rForm->zzzzsys_form_id === $homeFormId) continue; // avoid duplicate home
+                    $navItems[] = [
+                        'id' => 'form_' . $rForm->zzzzsys_form_id,
+                        'form_id' => $rForm->zzzzsys_form_id,
+                        'label' => $rForm->sfo_description ?: $rForm->sfo_code,
+                        'icon' => 'fa-file-text-o',
+                        'is_home' => false
+                    ];
+                }
+            }
+        }
+
+        // Fallback default navigation if DB forms are empty
+        if (count($navItems) <= 1) {
+            $navItems[] = ['id' => 'setup', 'label' => 'System Setup', 'icon' => 'fa-cog', 'action' => 'nuOpenSetup()', 'is_home' => false];
+            $navItems[] = ['id' => 'forms', 'label' => 'Form Builder', 'icon' => 'fa-file-text-o', 'action' => "nuSelectForm('nuform')", 'is_home' => false];
+            $navItems[] = ['id' => 'users', 'label' => 'User Management', 'icon' => 'fa-users', 'action' => "nuSelectForm('nuuser')", 'is_home' => false];
+        }
+
         $cache->set($cacheKey, $navItems, 600);
-        sendDashboardJson(['status' => 'success', 'items' => $navItems, 'cached' => false]);
+        sendDashboardJson(['status' => 'success', 'role' => $userRole, 'items' => $navItems, 'cached' => false]);
         break;
 
     default:
