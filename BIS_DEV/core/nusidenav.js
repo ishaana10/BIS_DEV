@@ -12,10 +12,9 @@ window.nuSideNav = {
             this.injectHTML();
         }
         this.checkVisibility();
-        this.loadNavItems();
     },
 
-    checkVisibility: function() {
+    isUserLoggedIn: function() {
         // Detect login screen components in nuBuilder
         var isLoginPage = $('#nuLoginForm').length > 0 ||
                           $('#nuusername').length > 0 ||
@@ -26,10 +25,17 @@ window.nuSideNav = {
         var hasActiveSession = window.nuSESSION && window.nuSESSION !== '';
         var hasLoadedForms = $('#nuRECORD').length > 0 || $('#nuBreadcrumbHolder').length > 0 || $('#nuTabHolder').length > 0;
 
-        var isLoggedIn = (hasActiveSession || hasLoadedForms) && !isLoginPage;
+        return (hasActiveSession || hasLoadedForms) && !isLoginPage;
+    },
 
-        if (isLoggedIn) {
+    checkVisibility: function() {
+        var loggedIn = this.isUserLoggedIn();
+
+        if (loggedIn) {
             $('#nu-sidenav-toggle-btn').css('display', 'inline-flex');
+            if (this.items.length === 0) {
+                this.loadNavItems();
+            }
         } else {
             $('#nu-sidenav-toggle-btn').css('display', 'none');
             this.close();
@@ -111,6 +117,7 @@ window.nuSideNav = {
     },
 
     loadNavItems: function() {
+        if (!this.isUserLoggedIn()) return;
         var self = this;
         $.ajax({
             url: 'actions/dashboard_actions.php?action=get_nav_items',
