@@ -68,7 +68,12 @@ function nuUseUP($nuBrowseFunction, $target, $welcome, $u, $p) {
 
 function nuGetJS_action_screen($nuBrowseFunction, $target, $welcome, $opener, $search, $like) {
 
-	$h2 = "function nuLoad(){
+	//-- If the page was reloaded or opened twice, the entry that describes what to show is already gone: say so instead of failing with a blank page
+	$h2 = "function nuOpenerMissing(id){
+		console.error('nuOPENER entry not found (page reloaded or opened twice?) opener=' + id + ' url=' + location.href);
+		document.body.innerHTML = '<div style=\"padding:20px;font-family:sans-serif\">This page could not restore its form (it was reloaded or opened twice). Please close it and open the form again.</div>';
+	}
+	function nuLoad(){
 		if(nuIsOpener(window)){
 			var from		= window.opener;
 		}else{
@@ -85,10 +90,12 @@ function nuGetJS_action_screen($nuBrowseFunction, $target, $welcome, $opener, $s
 		window.nuSuffix					= 1000;
 		if('$opener' != '') {
 			var p			= nuGetOpenerById(from.nuOPENER, Number($opener));
+			if(!p) { nuOpenerMissing('$opener'); return; }
 			nuRemoveOpenerById(from.nuOPENER, Number($opener));
 
 		} else {
 			var p			= from.nuOPENER[from.nuOPENER.length -1];
+			if(!p) { nuOpenerMissing(''); return; }
 			nuRemoveOpenerById(from.nuOPENER, from.nuOPENER[from.nuOPENER.length -1]);
 
 		}
