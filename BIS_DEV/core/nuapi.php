@@ -70,7 +70,8 @@
 	// does not queue every other request from the same user (A2 "user cap" freeze).
 	// $_SESSION stays readable in memory; login/logout/update/run* calls keep the lock.
 	$readOnlyCalls = ['getform', 'getphp', 'getreport', 'getlookupid', 'getlookupcode', 'getfile'];
-	if (in_array($callType, $readOnlyCalls, true) && session_status() === PHP_SESSION_ACTIVE) {
+	//-- Set $nuConfigKeepSessionLock = true; in nuconfig.php to keep the old behaviour (one request per user at a time).
+	if (empty($nuConfigKeepSessionLock) && in_array($callType, $readOnlyCalls, true) && session_status() === PHP_SESSION_ACTIVE) {
 		session_write_close();
 	}
 
