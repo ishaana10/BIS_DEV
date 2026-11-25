@@ -1,4 +1,4 @@
-// A 503 from the web server is a temporary refusal (too many simultaneous PHP processes / resource limit): the request was not run.
+// A quick 503 from the web server is a temporary refusal (too many simultaneous PHP processes / resource limit): the request was not run.
 // Read-only calls are therefore retried twice, after a short pause, before an error is shown.
 function nuAjaxIsRetryable(w) {
 	const readOnly = ['getform', 'getphp', 'getreport', 'getlookupid', 'getlookupcode', 'getfile'];
@@ -46,7 +46,8 @@ function nuAjax(w, successCallback, errorCallback, nuAttempt = 0) {
 		success: (data, textStatus, jqXHR) => successCallback(data, textStatus, jqXHR),
 		error: (jqXHR, textStatus, errorThrown) => {
 
-			const nuWillRetry = jqXHR.status === 503 && nuAttempt < 2 && nuAjaxIsRetryable(w);
+			//-- Only retry a quick refusal. A 503 that arrives after a long wait is a timeout while the server is still working on the request: a retry would just start the same slow query again.
+			const nuWillRetry = jqXHR.status === 503 && nuAttempt < 2 && nuAjaxIsRetryable(w) && (performance.now() - nuStarted) < 10000;
 			nuReportClientError(w, jqXHR, textStatus, nuAttempt, nuStarted, nuWillRetry);
 
 			if (nuWillRetry) {
