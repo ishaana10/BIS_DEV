@@ -1259,6 +1259,8 @@ function nuBuildTableSchema(){
 
 function nuBuildViewSchema(){
 
+	if (!nuGlobalAccess()) return [];	// result is discarded for non-global users, so skip the INFORMATION_SCHEMA query
+
 	$a				= [];
 	$t				= nuRunQuery("SELECT table_name as TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'VIEW' AND table_schema = DATABASE()");
 
