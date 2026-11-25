@@ -1,5 +1,10 @@
 function nuAjax(w, successCallback, errorCallback) {
 
+	// Tell the server which schema version this browser already holds, so it can skip resending it
+	if (w && window.nuFORM && nuFORM.schemaHash && nuFORM.tableSchema) {
+		w.schema_hash = nuFORM.schemaHash;
+	}
+
 	// Serialize data
 	const data = JSON.stringify(nuAddEditFieldsToHash(w));
 
