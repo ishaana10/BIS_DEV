@@ -16,7 +16,7 @@ $DBOptions		= $sessionData['DB_OPTIONS'] ?? $nuConfigDBOptions ?? null;
 $charSet		= [PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES $DBCharset"];
 
 if (is_array($DBOptions)) {
-	array_merge($charSet, $DBOptions);
+	$DBOptions = $DBOptions + $charSet;	// '+' keeps the integer PDO option keys; array_merge() would renumber them (and its result was being discarded)
 } else {
 	$DBOptions = $charSet;
 }
@@ -565,7 +565,7 @@ function nuID(){
 	$i	= uniqid();
 	$s	= md5($i);
 
-	while($i == uniqid()){}
+	while($i == uniqid()){ usleep(1); }
 
 	$prefix = $DBUser == 'nudev' ? 'nu' : '';
 	return $prefix.uniqid().$s[0].$s[1];
