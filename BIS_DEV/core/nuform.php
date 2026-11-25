@@ -321,7 +321,7 @@ function nuGetFormObject($F, $R, $OBJS, $tabs = null){
 					if (array_key_exists($chart_type, $chart_options)) {
 						$type = $chart_options[$chart_type]['type'];
 						$stacked = $chart_options[$chart_type]['stacked'];
-						$chart_type = $chart_options[$chart_type]['chart_type'];
+						$chart_type = $chart_options[$chart_type]['chart_type'] ?? '';
 
 						$htmlj = "\nnuChart('$r->sob_all_id', '$type', '$htmljs', '$title', '$h', '$v', '$chart_type', $stacked);";
 					}
