@@ -5,9 +5,11 @@ require_once(dirname(__FILE__). '/../nuconfig.php'); // nuconfig must be loaded 
 
 function nuImportNewDB() {
 
-	$t = nuRunQuery("SHOW TABLES");
+	if (!empty($_SESSION['nuDBImportChecked'])) {return;}		//-- already confirmed during this login
+
+	$t = nuRunQuery("SHOW TABLES LIKE 'zzzzsys\\_object'");		//-- was: list every table in the database on each page load
 	while($r = db_fetch_row($t)){
-		if($r[0] == 'zzzzsys_object'){return;}
+		if($r[0] == 'zzzzsys_object'){$_SESSION['nuDBImportChecked'] = true; return;}
 	}
 	$file						= __DIR__."/../nubuilder4.sql";
 	@$handle					= fopen($file, "r");

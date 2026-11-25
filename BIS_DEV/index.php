@@ -1,4 +1,7 @@
 <?php
+if (extension_loaded('zlib') && !ini_get('zlib.output_compression') && strpos($_SERVER['HTTP_ACCEPT_ENCODING'] ?? '', 'gzip') !== false) {
+	ob_start('ob_gzhandler');	//-- compress the page itself (text/html)
+}
 $nb_path = __DIR__;
 
 $nuconfig = "nuconfig.php";
