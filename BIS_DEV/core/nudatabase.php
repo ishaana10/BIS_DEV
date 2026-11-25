@@ -613,6 +613,8 @@ function nuPrepEval($code) {
 	$skipBefore = [T_OBJECT_OPERATOR, T_DOUBLE_COLON, T_FUNCTION, T_CONST, T_CLASS, T_INTERFACE, T_TRAIT, T_NEW, T_NAMESPACE, T_USE, T_INSTANCEOF, T_EXTENDS, T_IMPLEMENTS, T_NS_SEPARATOR, T_GOTO];
 	if (defined('T_NULLSAFE_OBJECT_OPERATOR')) { $skipBefore[] = T_NULLSAFE_OBJECT_OPERATOR; }
 
+	$reserved = ['true', 'false', 'null', 'self', 'parent', 'static', 'int', 'float', 'string', 'bool', 'array', 'callable', 'iterable', 'object', 'mixed', 'void', 'never', 'numeric'];
+
 	$count = count($tokens);
 	for ($i = 1; $i < $count; $i++) {
 
@@ -620,10 +622,19 @@ function nuPrepEval($code) {
 		if (!is_array($t) || $t[0] !== T_STRING) { continue; }
 
 		$name = $t[1];
-		if (!preg_match('/^[A-Z][A-Z0-9_]*$/', $name) || in_array($name, ['TRUE', 'FALSE', 'NULL'], true) || isset($ignore[$name]) || defined($name)) { continue; }
+		if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $name) || in_array(strtolower($name), $reserved, true) || isset($ignore[$name]) || defined($name)) { continue; }
 
 		$prev = $tokens[$i - 1];
 		$next = $tokens[$i + 1] ?? null;
+
+		//-- Other than UPPER_CASE names (nearly always constants), only treat a word as a bare constant where a value is expected:
+		//-- $row[station], f(station), $a . station . $b, $x = station;  This keeps class names, type hints and the like untouched.
+		if (!preg_match('/^[A-Z][A-Z0-9_]*$/', $name)) {
+			$before = is_array($prev) ? ($prev[0] === T_DOUBLE_ARROW ? '=>' : ($prev[0] === T_ECHO ? 'echo' : ($prev[0] === T_RETURN ? 'return' : ''))) : $prev;
+			if (!in_array($before, ['[', '(', ',', '.', '=', '=>', 'echo', 'return'], true)) { continue; }
+			$after = is_array($next) ? ($next[0] === T_DOUBLE_ARROW ? '=>' : '') : $next;
+			if (!in_array($after, [']', ')', ',', ';', '.', '=>'], true)) { continue; }
+		}
 
 		if (is_array($prev) && in_array($prev[0], $skipBefore, true)) { continue; }
 		if ($next === '(' || (is_array($next) && in_array($next[0], [T_DOUBLE_COLON, T_NS_SEPARATOR], true))) { continue; }
