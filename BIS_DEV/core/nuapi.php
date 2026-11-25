@@ -78,7 +78,12 @@
 	$nuT0 = microtime(true);
 	register_shutdown_function(function () use ($nuT0, $callType, $formId) {
 		$sec = microtime(true) - $nuT0;
-		if ($sec > 5) nuLog('SLOW', round($sec, 1) . 's', "call=$callType form=$formId");
+		$peakMb = memory_get_peak_usage(true) / 1048576;
+		$err = error_get_last();
+		$fatal = $err !== null && in_array($err['type'], [E_ERROR, E_CORE_ERROR, E_COMPILE_ERROR, E_PARSE, E_RECOVERABLE_ERROR], true);
+		if ($sec > 5 || $peakMb > 96 || $fatal) {
+			nuLog('SLOW', round($sec, 1) . 's', "call=$callType form=$formId peak=" . round($peakMb) . "MB" . ($fatal ? ' FATAL: ' . $err['message'] : ''));
+		}
 	});
 
 	$_POST['nuHash']['PREVIOUS_RECORD_ID'] 	= $recordId;
@@ -169,6 +174,14 @@
 		$f->forms[0]->tableSchema				= nuUpdateTableSchema($callType, $refreshCache && $globalAccess);
 		$f->forms[0]->viewSchema				= nuBuildViewSchema();
 		$f->forms[0]->formSchema				= nuUpdateFormSchema($refreshCache  && $globalAccess);
+
+		//-- The table/form schemas (~40 KB) rarely change: if the browser already holds this exact version, do not send it again
+		$schemaHash								= md5(json_encode($f->forms[0]->tableSchema) . '|' . json_encode($f->forms[0]->formSchema));
+		if ($f->forms[0]->tableSchema !== null && ($state['schema_hash'] ?? '') === $schemaHash) {
+			unset($f->forms[0]->tableSchema, $f->forms[0]->formSchema);
+			$f->forms[0]->schema_unchanged		= 1;
+		}
+		$f->forms[0]->schema_hash				= $schemaHash;
 
 		if ($refreshCache) nuSetJSONData('REFRESH_CACHE','0');
 

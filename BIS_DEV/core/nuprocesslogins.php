@@ -231,6 +231,7 @@ function nuLoginSetupGlobeadmin($loginName, $userId, $userName) {
 	];
 
 	nuRunQuery($sql, $values);
+	nuClearSessionAccessCache($_SESSION['nubuilder_session_data']['SESSION_ID']);
 	
 	nuCreateViewsOrTables();
 
@@ -407,6 +408,7 @@ function nuLoginSetupNOTGlobeadmin($new = true, $sSoUserName = "") {
 		$storeSessionInTableJSON,
 		$_SESSION['nubuilder_session_data']['SESSION_ID']
 	]);
+	nuClearSessionAccessCache($_SESSION['nubuilder_session_data']['SESSION_ID']);
 
 	return true;
 }

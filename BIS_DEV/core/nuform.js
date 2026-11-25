@@ -48,6 +48,11 @@ function nuBuildForm(f) {
 	window.nuOnSetSelect2Options = null;		// can be overwritten by nuAddJavaScript()
 	window.nuSERVERRESPONSE = f;						
 
+	if (f.schema_unchanged) {				//-- server skipped the schemas: reuse the copy already held
+		f.tableSchema = nuFORM.tableSchema;
+		f.formSchema = nuFORM.formSchema;
+	}
+
 	if (f.record_id != '-2') {
 		nuAddJavaScript(f.javascript_bc);
 	}
@@ -88,6 +93,7 @@ function nuBuildForm(f) {
 
 	nuFORM.tableSchema = f.tableSchema;
 	nuFORM.formSchema = f.formSchema;
+	nuFORM.schemaHash = f.schema_hash;
 	window.nuLANGUAGE = f.translation;
 
 	nuSetProperty('refreshed', nuGetProperty('refreshed') + 1);

@@ -379,9 +379,7 @@ function nuRunReport($report_id){
 
 function nuAllowedActivities(){
 
-	$t	= nuRunQuery("SELECT sss_access FROM zzzzsys_session WHERE zzzzsys_session_id = ? ", [$_SESSION['nubuilder_session_data']['SESSION_ID']]);
-	$r	= db_fetch_object($t);
-	$a	= nuJsonDecode($r->sss_access);
+	$a	= nuJsonDecode(nuGetSessionAccessRaw($_SESSION['nubuilder_session_data']['SESSION_ID']));
 
 	return $a;
 
@@ -457,7 +455,7 @@ function nuJavaScriptCallback($js){
 
 function nuSetJSONDataAll($i, $nj){
 
-	$GLOBALS['nuJSONDataCache']	= [];
+	nuClearSessionAccessCache();
 
 	$t						= nuRunQuery("SELECT zzzzsys_session_id, sss_access FROM zzzzsys_session");
 
@@ -476,20 +474,43 @@ function nuSetJSONDataAll($i, $nj){
 
 }
 
+function nuGetSessionAccessRaw($sessionId){
+
+	//-- zzzzsys_session is MyISAM (table-level locks): read the session JSON once per request and share it
+	if (!isset($GLOBALS['nuAccessRawCache'][$sessionId])) {
+
+		$stmt	= nuRunQuery("SELECT sss_access FROM zzzzsys_session WHERE zzzzsys_session_id = ? ", [$sessionId]);
+		$GLOBALS['nuAccessRawCache'][$sessionId] = db_num_rows($stmt) == 0 ? false : db_fetch_object($stmt)->sss_access;
+
+	}
+
+	return $GLOBALS['nuAccessRawCache'][$sessionId];
+
+}
+
+function nuClearSessionAccessCache($sessionId = null){
+
+	if ($sessionId === null) {
+		$GLOBALS['nuAccessRawCache'] = [];
+		$GLOBALS['nuJSONDataCache']  = [];
+		$GLOBALS['nuUserAccessCache'] = [];
+	} else {
+		unset($GLOBALS['nuAccessRawCache'][$sessionId], $GLOBALS['nuJSONDataCache'][$sessionId], $GLOBALS['nuUserAccessCache'][$sessionId]);
+	}
+
+}
+
 function nuSetJSONData($name, $newJson){
 
 	$sessionId			= $_SESSION['nubuilder_session_data']['SESSION_ID'];
-	$stmt				= nuRunQuery("SELECT sss_access FROM zzzzsys_session WHERE zzzzsys_session_id = ? ", [$sessionId]);
-
-	$row				= db_fetch_object($stmt);
-	$access				= nuJsonDecode($row->sss_access, true);
+	$access				= nuJsonDecode((string) nuGetSessionAccessRaw($sessionId), true);
 
 	$access[$name]		= $newJson;
 	$update				= json_encode($access);
 
 	nuRunQuery("UPDATE zzzzsys_session SET sss_access = ? WHERE zzzzsys_session_id = ? ", [$update, $sessionId]);
 
-	unset($GLOBALS['nuJSONDataCache'][$sessionId]);
+	nuClearSessionAccessCache($sessionId);
 
 }
 
@@ -501,14 +522,13 @@ function nuGetJSONData($name){
 
 	if (!isset($GLOBALS['nuJSONDataCache'][$sessionId])) {
 
-		$stmt			= nuRunQuery("SELECT sss_access FROM zzzzsys_session WHERE zzzzsys_session_id = ? ", [$sessionId]);
+		$raw			= nuGetSessionAccessRaw($sessionId);
 
-		if (db_num_rows($stmt) == 0) {
+		if ($raw === false) {
 			return '';
 		}
 
-		$row			= db_fetch_object($stmt);
-		$GLOBALS['nuJSONDataCache'][$sessionId] = nuJsonDecode($row->sss_access, true);
+		$GLOBALS['nuJSONDataCache'][$sessionId] = nuJsonDecode($raw, true);
 
 	}
 
@@ -912,13 +932,11 @@ function nuGetUserAccess(){
 		return $GLOBALS['nuUserAccessCache'][$sessionId];
 	}
 
-	$s							= "SELECT sss_access FROM zzzzsys_session WHERE zzzzsys_session_id = ? ";
-	$t							= nuRunQuery($s, [$sessionId]);
-	$r							= db_fetch_object($t);
+	$raw						= nuGetSessionAccessRaw($sessionId);
 
-	if (db_num_rows($t) == 0) return $A;
+	if ($raw === false) return $A;
 
-	$j							= nuJsonDecode($r->sss_access);
+	$j							= nuJsonDecode($raw);
 
 	$A['USER_ID']				= $j->session->zzzzsys_user_id;
 	$A['USER_GROUP_ID']			= $j->session->zzzzsys_access_id;

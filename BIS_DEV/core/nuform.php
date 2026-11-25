@@ -1455,9 +1455,7 @@ function nuGatherFormAndSessionData($home, $globalAccess){
 
 	if(!$globalAccess && $formAndSessionData->form_id != 'nuhome') {
 
-		$getAccessFromSessionTableQRY	= nuRunQuery("SELECT sss_access FROM zzzzsys_session WHERE zzzzsys_session_id = ? ", [$sessionId]);
-		$getAccessFromSessionTableOBJ	= db_fetch_object($getAccessFromSessionTableQRY);
-		$access 						= nuJsonDecode($getAccessFromSessionTableOBJ->sss_access);
+		$access 						= nuJsonDecode(nuGetSessionAccessRaw($sessionId));
 		$callType						= $formAndSessionData->call_type;
 
 		if($callType == 'getreport'){
@@ -1593,9 +1591,7 @@ function nuReportAccessList($j){
 
 function nuButtons($formid, $POST){
 
-	$t						= nuRunQuery("SELECT sss_access FROM zzzzsys_session WHERE zzzzsys_session_id = ? ", [$_SESSION['nubuilder_session_data']['SESSION_ID']]);
-	$r						= db_fetch_object($t);
-	$nuJ					= nuJsonDecode($r->sss_access);
+	$nuJ					= nuJsonDecode(nuGetSessionAccessRaw($_SESSION['nubuilder_session_data']['SESSION_ID']));
 	$_POST['forms']			= $nuJ->forms;
 	$_POST['reports']		= $nuJ->reports;
 	$_POST['procedures']	= $nuJ->procedures;

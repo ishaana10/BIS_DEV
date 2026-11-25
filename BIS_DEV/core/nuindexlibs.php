@@ -77,6 +77,7 @@ function nuGetJS_action_screen($nuBrowseFunction, $target, $welcome, $opener, $s
 		window.nuFORM.caller			= from.nuFORM.getCurrent();
 		nuFORM.tableSchema				= from.nuFORM.tableSchema;
 		nuFORM.formSchema				= from.nuFORM.formSchema;
+		nuFORM.schemaHash				= from.nuFORM.schemaHash;
 		window.nuDefaultBrowseFunction	= '$nuBrowseFunction';
 		window.nuBrowseFunction			= '$nuBrowseFunction';
 		window.nuTARGET					= '$target';
