@@ -597,7 +597,7 @@ function nuUpdateDatabaseRunBeforeDeleteEvent(&$nudata) {
 
 	$p = nuProcedure('nuBeforeDelete');
 	if ($p != '') {
-		eval($p);
+		eval(nuPrepEval($p));
 	}
 	if (nuHasErrors()) {
 		return false;
@@ -612,7 +612,7 @@ function nuUpdateDatabaseRunBeforeSaveEvents(&$nudata, $nuDataFormId) {
 	// Global Before Save event
 	$proc = nuProcedure('nuBeforeSave');
 	if ($proc != '') {
-		eval($proc);
+		eval(nuPrepEval($proc));
 	}
 	if (nuHasErrors()) {
 		return false;
@@ -637,7 +637,7 @@ function nuUpdateDatabaseRunAfterEvents($deleteAction, $dataFormId) {
 	$proc = nuProcedure($procName);
 
 	if ($proc) {
-		eval($proc);
+		eval(nuPrepEval($proc));
 	}
 
 	if (nuHasErrors()) {

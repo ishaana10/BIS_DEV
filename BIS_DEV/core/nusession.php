@@ -11,7 +11,7 @@ function nuRunLoginProcedure($procedure) {
 	$p		= nuProcedure($procedure);
 	$error	= '';
 	if($p != ''){
-		eval($p);
+		eval(nuPrepEval($p));
 		if ($error != '') nuDie($error);
 	}
 }

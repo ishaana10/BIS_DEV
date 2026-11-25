@@ -15,7 +15,7 @@ function nuBeforeBrowse($f){
 	$_POST['nuMessages']	= [];
 
 	$p	= nuProcedure('nuBeforeBrowse');
-	if($p != '') { eval($p); }
+	if($p != '') { eval(nuPrepEval($p)); }
 	if(count($_POST['nuErrors']) > 0){return;}
 
 	nuEval($f . '_BB');
@@ -106,7 +106,7 @@ function nuBeforeEdit($FID, $RID){
 	if ($recordID != '') {
 		$p = nuProcedure('nuBeforeEdit');
 		if($p != '') { 
-			eval($p); 
+			eval(nuPrepEval($p)); 
 		}
 		if(count($_POST['nuErrors']) > 0){
 			return;
@@ -509,7 +509,7 @@ function nuOnProcess($F, &$f, $eventCode, $functionName){
 		if (strpos($p, $functionName) !== false) {
 			$body = nuExtractFunctionBody($functionName, $p);
 			if ($body != null) {
-				eval($body);
+				eval(nuPrepEval($body));
 			}
 		}
 	}

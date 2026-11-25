@@ -514,7 +514,7 @@ function nuDebugResult($nuDebugMsg){
 
 	$proc	= nuProcedure('NUDEBUGRESULTADDED');
 	if($proc != '') { 
-		eval($proc); 
+		eval(nuPrepEval($proc)); 
 	}
 
 	return $nuDebugId;
@@ -577,6 +577,78 @@ function nuLog($s1, $s2 = '', $s3 = '') {
 		@rename($file, $dir . 'nulog.old.txt');
 	}
 	file_put_contents($file, $data.PHP_EOL , FILE_APPEND | LOCK_EX);
+
+}
+
+function nuPrepEval($code) {
+
+	//-- PHP 7 treated an unknown bare word such as ACCESS_LEVEL_CODE as the string 'ACCESS_LEVEL_CODE' (with a warning). PHP 8 throws an Error instead.
+	//-- Stored code written for PHP 7 therefore stops working after an upgrade. For upper case bare words that are not defined anywhere,
+	//-- define a constant whose value is its own name, which is exactly what PHP 7 did. Nothing happens on PHP 7.
+	if (PHP_VERSION_ID < 80000 || !is_string($code) || $code === '') {
+		return $code;
+	}
+
+	static $seen = [];
+	$key = md5($code);
+	if (isset($seen[$key])) {
+		return $code;
+	}
+	$seen[$key] = true;
+
+	$ignore = [];
+	if (preg_match_all('/\bdefine\s*\(\s*[\'"]([A-Za-z0-9_]+)[\'"]/i', $code, $m)) { foreach ($m[1] as $n) { $ignore[$n] = true; } }
+	if (preg_match_all('/\bconst\s+([A-Za-z0-9_]+)\s*=/i', $code, $m)) { foreach ($m[1] as $n) { $ignore[$n] = true; } }
+
+	$tokens = [];
+	try {
+		foreach (token_get_all('<?php ' . $code) as $t) {
+			if (is_array($t) && in_array($t[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) { continue; }
+			$tokens[] = $t;
+		}
+	} catch (Throwable $e) {
+		return $code;
+	}
+
+	$skipBefore = [T_OBJECT_OPERATOR, T_DOUBLE_COLON, T_FUNCTION, T_CONST, T_CLASS, T_INTERFACE, T_TRAIT, T_NEW, T_NAMESPACE, T_USE, T_INSTANCEOF, T_EXTENDS, T_IMPLEMENTS, T_NS_SEPARATOR, T_GOTO];
+	if (defined('T_NULLSAFE_OBJECT_OPERATOR')) { $skipBefore[] = T_NULLSAFE_OBJECT_OPERATOR; }
+
+	$count = count($tokens);
+	for ($i = 1; $i < $count; $i++) {
+
+		$t = $tokens[$i];
+		if (!is_array($t) || $t[0] !== T_STRING) { continue; }
+
+		$name = $t[1];
+		if (!preg_match('/^[A-Z][A-Z0-9_]*$/', $name) || in_array($name, ['TRUE', 'FALSE', 'NULL'], true) || isset($ignore[$name]) || defined($name)) { continue; }
+
+		$prev = $tokens[$i - 1];
+		$next = $tokens[$i + 1] ?? null;
+
+		if (is_array($prev) && in_array($prev[0], $skipBefore, true)) { continue; }
+		if ($next === '(' || (is_array($next) && in_array($next[0], [T_DOUBLE_COLON, T_NS_SEPARATOR], true))) { continue; }
+		if ($next === ':' && ($prev === '(' || $prev === ',')) { continue; }		//-- named argument
+
+		define($name, $name);
+		nuLogOnce('PHP8COMPAT', $name, "bare constant $name treated as the string '$name' (PHP 7 behaviour). Write it with quotes in the stored code.");
+
+	}
+
+	return $code;
+
+}
+
+function nuLogOnce($type, $key, $message) {
+
+	//-- one line per $key in temp/nulog.txt (remembered in temp/logonce.txt)
+	$file  = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'temp' . DIRECTORY_SEPARATOR . 'logonce.txt';
+	$known = is_file($file) ? (array) file($file, FILE_IGNORE_NEW_LINES) : [];
+	$id    = $type . ':' . $key;
+
+	if (!in_array($id, $known, true)) {
+		@file_put_contents($file, $id . PHP_EOL, FILE_APPEND | LOCK_EX);
+		nuLog($type, $key, $message);
+	}
 
 }
 
