@@ -79,6 +79,41 @@ function nuCSSIndexInclude($pfile, $refreshCache = true){
 	nuInclude($pfile, 'stylesheet', $refreshCache);
 }
 
+function nuLazyLibsInclude($libs){
+
+	//-- Heavy libraries (webdatarocks 1.4 MB, uppy 0.5 MB) are almost never used. Define each global as a lazy accessor:
+	//-- the first read fetches the (browser-cached) file synchronously, runs it and returns the real global.
+	$map = array();
+	foreach ($libs as $name => $file) {
+		$map[$name] = $file . '?ts=' . (is_file($file) ? filemtime($file) : 1);
+	}
+
+	print "<script>(function(libs){
+	function load(src){
+		try {
+			var x = new XMLHttpRequest();
+			x.open('GET', src, false);
+			x.send(null);
+			if (x.status === 200) {
+				var s = document.createElement('script');
+				s.text = x.responseText;
+				document.head.appendChild(s);
+				document.head.removeChild(s);
+			}
+		} catch (e) {}
+	}
+	Object.keys(libs).forEach(function(n){
+		Object.defineProperty(window, n, {
+			configurable: true,
+			enumerable: false,
+			get: function(){ delete window[n]; load(libs[n]); return window[n]; },
+			set: function(v){ Object.defineProperty(window, n, {value: v, writable: true, configurable: true, enumerable: true}); }
+		});
+	});
+})(" . json_encode($map) . ");</script>\n";
+
+}
+
 function nuJSChartsInclude(){
 
 	global $nuConfigIncludeGoogleCharts;
@@ -134,12 +169,11 @@ nuJSIndexInclude('core/libs/ctxmenu/ctxmenu.min.js');
 nuJSIndexInclude('core/libs/vanillajs-datepicker/datepicker-full.min.js');
 //nuJSIndexInclude('core/libs/jquery/jquery-confirm.min.js');
 nuCSSIndexInclude('core/libs/uppy/uppy.min.css');
-nuJSIndexInclude('core/libs/uppy/uppy.min.js');
 //nuJSIndexInclude('core/libs/tableToExcel.js');
 
 nuJSIndexInclude('core/libs/select2/select2.min.js');
 //nuJSIndexInclude('webpivot/webdatarocks.toolbar.min.js');
-nuJSIndexInclude('webpivot/webdatarocks.js');
+nuLazyLibsInclude(array('Uppy' => 'core/libs/uppy/uppy.min.js', 'WebDataRocks' => 'webpivot/webdatarocks.js'));
 nuCSSIndexInclude('webpivot/webdatarocks.min.css');
 
 
