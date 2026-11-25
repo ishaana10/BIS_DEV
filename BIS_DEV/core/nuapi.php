@@ -45,6 +45,7 @@
 		require_once('nudiag.php');
 		nuDiagInstallErrorHandler();
 		nuDiagStart($callType, nuObjKey($state, 'form_id', ''));
+	nuLogOnce('PHPENV', PHP_VERSION . '|' . PHP_SAPI, 'php=' . PHP_VERSION . ' sapi=' . PHP_SAPI . ' os=' . PHP_OS . ' memory_limit=' . ini_get('memory_limit') . ' max_execution_time=' . ini_get('max_execution_time') . ' opcache=' . (int) ini_get('opcache.enable') . ' pdo_mysql=' . (extension_loaded('pdo_mysql') ? 1 : 0));
 	}
 
 	$globalAccess 							= nuGlobalAccess(false);

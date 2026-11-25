@@ -560,6 +560,8 @@ function nuDebug($a){
 
 	}
 
+	nuLog('NUDEBUG', substr(trim(preg_replace('/\s+/', ' ', strip_tags($m))), 0, 800));	//-- also keep it in the log file, next to the other errors
+
 	nuDebugResult($m);
 
 }

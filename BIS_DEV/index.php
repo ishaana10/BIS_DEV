@@ -154,6 +154,7 @@ function nuLastLoggedInUser() {
 	return $_SESSION['nuLastUser']['user_id'] ?? "";
 }
 
+if (empty($nuConfigDisableClientLog)) nuJSIndexInclude('core/nuclienterrors.js');
 nuJSIndexInclude('core/libs/jquery/jquery-3.7.0.min.js', false);
 nuJSIndexInclude('core/nuwysiwyg.js');
 nuJSIndexInclude('core/nuformclass.js');
