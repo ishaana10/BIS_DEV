@@ -594,9 +594,9 @@ function nuPrepEval($code) {
 	static $seen = [];
 	$key = md5($code);
 	if (isset($seen[$key])) {
-		return $code;
+		return $seen[$key];
 	}
-	$seen[$key] = true;
+	$seen[$key] = $code;
 
 	$ignore = [];
 	if (preg_match_all('/\bdefine\s*\(\s*[\'"]([A-Za-z0-9_]+)[\'"]/i', $code, $m)) { foreach ($m[1] as $n) { $ignore[$n] = true; } }
@@ -647,7 +647,87 @@ function nuPrepEval($code) {
 
 	}
 
-	return $code;
+	return $seen[$key] = nuPrepEvalFunctions($code);
+
+}
+
+function nuPrepEvalFunctions($code) {
+
+	//-- PHP 8 throws a TypeError where PHP 7 gave a warning and carried on: in_array($x, null) and count(null). Stored code written for PHP 7 does this
+	//-- without anyone noticing (an empty setting, a missing array). Calls to these two functions in stored code are routed to nuInArray() and nuCount(),
+	//-- which behave as PHP 7 did (false and 0) and write one line to temp/nulog.txt saying where it happened. Only the function name changes: line numbers stay the same.
+	if (!preg_match('/\b(in_array|count|sizeof)\s*\(/i', $code)) {
+		return $code;
+	}
+
+	$map  = ['in_array' => 'nuInArray', 'count' => 'nuCount', 'sizeof' => 'nuCount'];
+	$skip = [T_OBJECT_OPERATOR, T_DOUBLE_COLON, T_FUNCTION, T_NEW, T_NS_SEPARATOR];
+	if (defined('T_NULLSAFE_OBJECT_OPERATOR')) { $skip[] = T_NULLSAFE_OBJECT_OPERATOR; }
+
+	try {
+		$all = token_get_all('<?php ' . $code);
+	} catch (Throwable $e) {
+		return $code;
+	}
+
+	$out     = '';
+	$changed = false;
+	$prev    = null;		//-- last token that is not whitespace or a comment
+	$n       = count($all);
+
+	for ($i = 0; $i < $n; $i++) {
+
+		$t = $all[$i];
+
+		if (is_array($t) && $t[0] === T_STRING && isset($map[strtolower($t[1])]) && !(is_array($prev) && in_array($prev[0], $skip, true))) {
+
+			$j = $i + 1;
+			while ($j < $n && is_array($all[$j]) && in_array($all[$j][0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) { $j++; }
+
+			if ($j < $n && $all[$j] === '(') {
+				$out    .= $map[strtolower($t[1])];
+				$changed = true;
+				$prev    = $t;
+				continue;
+			}
+		}
+
+		$out .= is_array($t) ? $t[1] : $t;
+		if (!is_array($t) || !in_array($t[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) { $prev = $t; }
+
+	}
+
+	return $changed ? substr($out, 6) : $code;		//-- 6 = length of the '<?php ' added above
+
+}
+
+function nuInArray($needle, $haystack, $strict = false) {
+
+	if (!is_array($haystack)) {
+		nuPhp8Note('in_array', $haystack, 'false');
+		return false;
+	}
+
+	return in_array($needle, $haystack, $strict);
+
+}
+
+function nuCount($value, $mode = COUNT_NORMAL) {
+
+	if (is_array($value) || $value instanceof Countable) {
+		return count($value, $mode);
+	}
+
+	nuPhp8Note('count', $value, $value === null ? '0' : '1');
+	return $value === null ? 0 : 1;
+
+}
+
+function nuPhp8Note($function, $value, $returned) {
+
+	$b   = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
+	$loc = ($b[1]['file'] ?? '?') . ':' . ($b[1]['line'] ?? 0);
+	nuLogOnce('PHP8COMPAT', $function . ' ' . $loc, "$function() was given " . gettype($value) . " instead of an array at $loc (PHP 7 carried on and returned $returned). Fix the stored code (e.g. use ?? []).");
 
 }
 
