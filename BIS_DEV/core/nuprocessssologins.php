@@ -117,7 +117,7 @@ function nuSsoDetermineAccessLevelForFirstLogin($ssodb_d) {
 	// (If it does not exist, an error will be generated).
 	$p		= nuProcedure("DETERMINE_ACCESS_LEVEL_FOR_FIRST_SSO_LOGIN");
 	if($p != ''){
-		eval($p);
+		eval(nuPrepEval($p));
 		if ($error != '') nuDie($error);
 	}
 	if($accessLevel == 'Unset') $accessLevel = 'Default';

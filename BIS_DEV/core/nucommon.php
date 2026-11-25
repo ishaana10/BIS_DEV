@@ -1162,7 +1162,7 @@ function nuBuildTempTable($name_id, $tt, $rd = 0){
 
 		$P			= "	nuRunQuery('CREATE TABLE $tt SELECT * FROM $id');;";
 
-		eval($P);
+		eval(nuPrepEval($P));
 
 	}
 
@@ -1190,7 +1190,7 @@ function nuBuildTempTable($name_id, $tt, $rd = 0){
 		$P			 = '$sql = "CREATE TABLE '.$tt.' '.$p.'";';
 		$P			.= 'nuRunQuery($sql);';
 
-		eval($P);
+		eval(nuPrepEval($P));
 
 	}
 
@@ -1488,7 +1488,7 @@ function nuEval($phpid){
 	$nudata = $nuDataSet ? $_POST['nudata'] : '';
 
 	try{
-		eval($php);
+		eval(nuPrepEval($php));
 	}catch(Throwable $e){
 		nuExceptionHandler($e, $code);
 	}catch(Exception $e){
@@ -1507,7 +1507,7 @@ function nuRunProcedure($procedure) {
 	$error	= '';
 
 	if($procResult){
-		eval($procResult);
+		eval(nuPrepEval($procResult));
 		return $error === '' ? true : $error;
 	}
 

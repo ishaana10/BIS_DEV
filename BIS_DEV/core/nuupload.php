@@ -47,7 +47,7 @@ function nuUploadFile() {
 
 		$code = nuProcedure($proc);
 		if ($code != '') {
-			eval($code);
+			eval(nuPrepEval($code));
 			return $result;
 		}
 		else {
