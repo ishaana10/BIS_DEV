@@ -52,9 +52,18 @@ function nuInclude($pfile, $type, $refreshCache = true){
 	}
 
 	foreach ($a as $value) {
-		$timestamp =  $refreshCache ? date("YmdHis") : 1; //-- Add timestamp so JavaScript changes are effective immediately if $refreshCache is true
-		if ($type == 'script') print "<script src='$value?ts=$timestamp' type='text/javascript'></script>\n";
-		if ($type == 'stylesheet') print "<link rel='stylesheet' href='$value?ts=$timestamp' />\n";
+
+		if (preg_match('#^(https?:)?//#i', $value)) {
+			$query = '';	//-- external URL: leave as is
+		} else if ($refreshCache) {
+			//-- Version by file modification time: JavaScript/CSS changes are effective immediately, but an unchanged file keeps the same URL and stays cached by the browser
+			$query = '?ts=' . (is_file($value) ? filemtime($value) : date("YmdHis"));
+		} else {
+			$query = '?ts=1';
+		}
+
+		if ($type == 'script') print "<script src='$value$query' type='text/javascript'></script>\n";
+		if ($type == 'stylesheet') print "<link rel='stylesheet' href='$value$query' />\n";
 	}
 
 }
