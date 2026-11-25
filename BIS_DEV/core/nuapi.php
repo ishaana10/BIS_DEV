@@ -61,6 +61,21 @@
 		}
 	}
 
+	// Release the PHP session file lock for read-only calls, so one slow request
+	// does not queue every other request from the same user (A2 "user cap" freeze).
+	// $_SESSION stays readable in memory; login/logout/update/run* calls keep the lock.
+	$readOnlyCalls = ['getform', 'getphp', 'getreport', 'getlookupid', 'getlookupcode', 'getfile'];
+	if (in_array($callType, $readOnlyCalls, true) && session_status() === PHP_SESSION_ACTIVE) {
+		session_write_close();
+	}
+
+	// Log requests slower than 5 seconds to temp/nulog.txt (remove once the cause is found)
+	$nuT0 = microtime(true);
+	register_shutdown_function(function () use ($nuT0, $callType, $formId) {
+		$sec = microtime(true) - $nuT0;
+		if ($sec > 5) nuLog('SLOW', round($sec, 1) . 's', "call=$callType form=$formId");
+	});
+
 	$_POST['nuHash']['PREVIOUS_RECORD_ID'] 	= $recordId;
 	$_POST['nuHash']['RECORD_ID'] 			= $recordId;
 	$_POST['nuHash']['FORM_ID'] 			= $formId;

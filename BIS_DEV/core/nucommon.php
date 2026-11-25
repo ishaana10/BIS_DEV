@@ -460,6 +460,8 @@ function nuJavaScriptCallback($js){
 
 function nuSetJSONDataAll($i, $nj){
 
+	$GLOBALS['nuJSONDataCache']	= [];
+
 	$t						= nuRunQuery("SELECT zzzzsys_session_id, sss_access FROM zzzzsys_session");
 
 	while($r = db_fetch_object($t)){
@@ -490,21 +492,30 @@ function nuSetJSONData($name, $newJson){
 
 	nuRunQuery("UPDATE zzzzsys_session SET sss_access = ? WHERE zzzzsys_session_id = ? ", [$update, $sessionId]);
 
+	unset($GLOBALS['nuJSONDataCache'][$sessionId]);
+
 }
 
 function nuGetJSONData($name){
 
+	// The session JSON (which holds the cached table/form schemas) is read several times per request.
+	// Keep one decoded copy per request; nuSetJSONData()/nuSetJSONDataAll() clear it.
 	$sessionId			= $_SESSION['nubuilder_session_data']['SESSION_ID'];
-	$stmt				= nuRunQuery("SELECT sss_access FROM zzzzsys_session WHERE zzzzsys_session_id = ? ", [$sessionId]);
 
-	if (db_num_rows($stmt) > 0) {
+	if (!isset($GLOBALS['nuJSONDataCache'][$sessionId])) {
+
+		$stmt			= nuRunQuery("SELECT sss_access FROM zzzzsys_session WHERE zzzzsys_session_id = ? ", [$sessionId]);
+
+		if (db_num_rows($stmt) == 0) {
+			return '';
+		}
+
 		$row			= db_fetch_object($stmt);
-		$access			= nuJsonDecode($row->sss_access, true);
-	} else {
-		return '';
+		$GLOBALS['nuJSONDataCache'][$sessionId] = nuJsonDecode($row->sss_access, true);
+
 	}
 
-	return nuObjKey($access, $name,'');
+	return nuObjKey($GLOBALS['nuJSONDataCache'][$sessionId], $name,'');
 
 }
 
@@ -1214,24 +1225,29 @@ function nuHash(){
 
 function nuBuildFormSchema(){
 
-	$T				= nuRunQuery("SELECT zzzzsys_form_id FROM zzzzsys_form ORDER BY sfo_code");
+	// One query for all forms and their input-type objects (was 1 + one query per form)
+	$sql			= "
+		SELECT f.zzzzsys_form_id, o.zzzzsys_object_id, o.sob_all_id, o.sob_all_type, o.sob_all_label, o.sob_input_type
+		FROM zzzzsys_form f
+		LEFT JOIN zzzzsys_object o
+			ON o.sob_all_zzzzsys_form_id = f.zzzzsys_form_id
+			AND o.sob_all_type IN ('input', 'lookup', 'select', 'textarea')
+		ORDER BY f.sfo_code, f.zzzzsys_form_id, o.sob_all_id
+	";
+	$T				= nuRunQuery($sql);
 	$fs				= [];
 
 	while($r = db_fetch_object($T)){
 
 		$f			= $r->zzzzsys_form_id;
-		$a			= [];
-		$t			= nuRunQuery("SELECT zzzzsys_object_id, sob_all_id, sob_all_type, sob_all_label, sob_input_type FROM zzzzsys_object WHERE sob_all_zzzzsys_form_id = '$f' ORDER BY sob_all_id");
 
-		while($r = db_fetch_object($t)){
-
-			if(in_array($r->sob_all_type, ['input', 'lookup', 'select', 'textarea'])){
-				$a[] = [$r->zzzzsys_object_id, $r->sob_all_id, $r->sob_all_label, $r->sob_all_type, $r->sob_input_type];
-			}
-
+		if (!isset($fs[$f])) {
+			$fs[$f]	= [];
 		}
 
-		$fs[$f]		= $a;
+		if ($r->zzzzsys_object_id !== null) {
+			$fs[$f][] = [$r->zzzzsys_object_id, $r->sob_all_id, $r->sob_all_label, $r->sob_all_type, $r->sob_input_type];
+		}
 
 	}
 
@@ -1241,15 +1257,29 @@ function nuBuildFormSchema(){
 
 function nuBuildTableSchema(){
 
+	// One INFORMATION_SCHEMA.COLUMNS query instead of a DESCRIBE per table.
+	// COLUMN_TYPE/COLUMN_KEY are what DESCRIBE reports as Type/Key; ORDINAL_POSITION keeps DESCRIBE's column order.
 	$a				= [];
 	$t				= nuRunQuery("SELECT table_name as TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE table_schema = DATABASE()");
 
 	while($r = db_fetch_object($t)){
+		$a[$r->TABLE_NAME] = ['names' => [], 'types' => [], 'primary_key' => [], 'valid' => 1];
+	}
 
-		$tn			= $r->TABLE_NAME;
+	$c				= nuRunQuery("SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, COLUMN_KEY FROM INFORMATION_SCHEMA.COLUMNS WHERE table_schema = DATABASE() ORDER BY TABLE_NAME, ORDINAL_POSITION");
 
-		$info = db_field_info($tn);
-		$a[$tn]		= ['names' => $info[0], 'types' => $info[1], 'primary_key' => $info[2], 'valid' => 1];
+	while($r = db_fetch_object($c)){
+
+		if (!isset($a[$r->TABLE_NAME])) {
+			continue;
+		}
+
+		$a[$r->TABLE_NAME]['names'][]	= $r->COLUMN_NAME;
+		$a[$r->TABLE_NAME]['types'][]	= $r->COLUMN_TYPE;
+
+		if ($r->COLUMN_KEY === 'PRI') {
+			$a[$r->TABLE_NAME]['primary_key'][] = $r->COLUMN_NAME;
+		}
 
 	}
 
@@ -1258,6 +1288,8 @@ function nuBuildTableSchema(){
 }
 
 function nuBuildViewSchema(){
+
+	if (!nuGlobalAccess()) return [];	// result is discarded for non-global users, so skip the INFORMATION_SCHEMA query
 
 	$a				= [];
 	$t				= nuRunQuery("SELECT table_name as TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'VIEW' AND table_schema = DATABASE()");
