@@ -41,6 +41,12 @@
 	$_POST['nuHash']						= array_merge($user, nuSetHashList($state));
 	$callType								= $state['call_type'];
 
+	if (empty($nuConfigDiagOff)) {			//-- see nudiag.php
+		require_once('nudiag.php');
+		nuDiagInstallErrorHandler();
+		nuDiagStart($callType, nuObjKey($state, 'form_id', ''));
+	}
+
 	$globalAccess 							= nuGlobalAccess(false);
 	$refreshCache							= nuGetJSONData('REFRESH_CACHE') == '1';
 

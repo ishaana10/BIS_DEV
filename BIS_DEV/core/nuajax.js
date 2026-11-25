@@ -5,7 +5,26 @@ function nuAjaxIsRetryable(w) {
 	return !!w && readOnly.indexOf(w.call_type) !== -1;
 }
 
+// Send an error the browser received from nuapi.php to temp/nulog.txt (best effort: the server may be the one that is failing)
+window.nuAjaxRunning = window.nuAjaxRunning || 0;
+
+function nuReportClientError(w, jqXHR, textStatus, attempt, started, retried) {
+	try {
+		const body = String(jqXHR.responseText || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').slice(0, 160);
+		const payload = JSON.stringify({
+			status: jqXHR.status, text: textStatus, call: w && w.call_type, form: w && w.form_id,
+			attempt: attempt, ms: Math.round(performance.now() - started), inflight: window.nuAjaxRunning, retried: retried ? 1 : 0, body: body
+		});
+		if (navigator.sendBeacon) {
+			navigator.sendBeacon('core/nuclientlog.php', new Blob([payload], { type: 'text/plain' }));
+		}
+	} catch (e) { }
+}
+
 function nuAjax(w, successCallback, errorCallback, nuAttempt = 0) {
+
+	const nuStarted = performance.now();
+	window.nuAjaxRunning++;
 
 	// Tell the server which schema version this browser already holds, so it can skip resending it
 	if (w && window.nuFORM && nuFORM.schemaHash && nuFORM.tableSchema) {
@@ -27,7 +46,10 @@ function nuAjax(w, successCallback, errorCallback, nuAttempt = 0) {
 		success: (data, textStatus, jqXHR) => successCallback(data, textStatus, jqXHR),
 		error: (jqXHR, textStatus, errorThrown) => {
 
-			if (jqXHR.status === 503 && nuAttempt < 2 && nuAjaxIsRetryable(w)) {
+			const nuWillRetry = jqXHR.status === 503 && nuAttempt < 2 && nuAjaxIsRetryable(w);
+			nuReportClientError(w, jqXHR, textStatus, nuAttempt, nuStarted, nuWillRetry);
+
+			if (nuWillRetry) {
 				setTimeout(() => nuAjax(w, successCallback, errorCallback, nuAttempt + 1), 700 * (nuAttempt + 1) + Math.random() * 400);
 				return;
 			}
@@ -41,7 +63,7 @@ function nuAjax(w, successCallback, errorCallback, nuAttempt = 0) {
 
 		},
 		complete: (jqXHR, textStatus) => {
-			// Do something when the request completes
+			window.nuAjaxRunning = Math.max(0, window.nuAjaxRunning - 1);
 		},
 	});
 }

@@ -555,7 +555,11 @@ function nuLog($s1, $s2 = '', $s3 = '') {
 	// $data = print_r($dataToLog, true);
 
 	$dir = dirname(__DIR__, 1) . DIRECTORY_SEPARATOR. 'temp' . DIRECTORY_SEPARATOR;
-	file_put_contents($dir . 'nulog.txt', $data.PHP_EOL , FILE_APPEND | LOCK_EX);
+	$file = $dir . 'nulog.txt';
+	if (@filesize($file) > 2097152) {		//-- keep the log small: roll over at 2 MB
+		@rename($file, $dir . 'nulog.old.txt');
+	}
+	file_put_contents($file, $data.PHP_EOL , FILE_APPEND | LOCK_EX);
 
 }
 
