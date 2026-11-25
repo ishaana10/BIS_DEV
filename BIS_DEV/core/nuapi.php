@@ -2,11 +2,6 @@
 	header("Content-Type: application/json");
 	header("Cache-Control: no-cache, must-revalidate");
 
-	// Compress the response (each getform call carries ~40 KB of table/form schema JSON)
-	if (extension_loaded('zlib') && !ini_get('zlib.output_compression') && strpos($_SERVER['HTTP_ACCEPT_ENCODING'] ?? '', 'gzip') !== false) {
-		ob_start('ob_gzhandler');
-	}
-
 	$nuState = $_POST['nuSTATE'] ?? null;
 	if ($nuState == null && !empty($_FILES["file"])) {
 		require_once('nuupload.php');
@@ -22,6 +17,11 @@
 	$_POST['nuSTATE'] = json_decode($nuState, true);
 
 	require_once('../nuconfig.php');
+
+	// Compress the response (getform responses can be large). Set $nuConfigDisableGzip = true; in nuconfig.php to switch this off.
+	if (empty($nuConfigDisableGzip) && extension_loaded('zlib') && !ini_get('zlib.output_compression') && strpos($_SERVER['HTTP_ACCEPT_ENCODING'] ?? '', 'gzip') !== false) {
+		ob_start('ob_gzhandler');
+	}
 	require_once('nusecurity.php');
 	require_once('nusession.php');
 	require_once('nucommon.php');
