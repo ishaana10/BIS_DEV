@@ -114,6 +114,19 @@ function nuDebugMessageString($user, $message, $sql, $trace) {
 
 }
 
+function nuNoteQueryTime($start, $sql) {
+
+	//-- Adds up the time spent in the database for this request and logs any single query slower than 2 seconds (see SLOW in nuapi.php)
+	$sec = microtime(true) - $start;
+	$GLOBALS['nuSqlTime']  = ($GLOBALS['nuSqlTime'] ?? 0) + $sec;
+	$GLOBALS['nuSqlCount'] = ($GLOBALS['nuSqlCount'] ?? 0) + 1;
+
+	if ($sec > 2) {
+		nuLog('SLOWSQL', round($sec, 1) . 's', gmdate('H:i:s') . ' UTC ' . substr(trim(preg_replace('/\s+/', ' ', $sql)), 0, 400));
+	}
+
+}
+
 function nuRunQuery($sql, $params = [], $isInsert = false){
 
 	global $DBHost;
@@ -137,10 +150,14 @@ function nuRunQuery($sql, $params = [], $isInsert = false){
 	// nuLog($s, count($params)> 0 ? $params[0] : '');
 	$stmt = $nuDB->prepare($sql);
 
+	$nuQueryStart = microtime(true);
+
 	try {
 		$stmt->execute($params);
+		nuNoteQueryTime($nuQueryStart, $sql);
 	}catch(PDOException $ex){
 
+		nuNoteQueryTime($nuQueryStart, $sql);
 		$user 		= nuDebugUserId();
 		$message	= $ex->getMessage();
 		$array 		= debug_backtrace();
