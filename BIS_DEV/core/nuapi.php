@@ -89,7 +89,7 @@
 		$err = error_get_last();
 		$fatal = $err !== null && in_array($err['type'], [E_ERROR, E_CORE_ERROR, E_COMPILE_ERROR, E_PARSE, E_RECOVERABLE_ERROR], true);
 		if ($sec > 5 || $peakMb > 96 || $fatal) {
-			nuLog('SLOW', round($sec, 1) . 's', "call=$callType form=$formId peak=" . round($peakMb) . "MB" . ($fatal ? ' FATAL: ' . $err['message'] : ''));
+			nuLog('SLOW', round($sec, 1) . 's', "call=$callType form=$formId peak=" . round($peakMb) . "MB sql=" . round($GLOBALS['nuSqlTime'] ?? 0, 1) . "s/" . ($GLOBALS['nuSqlCount'] ?? 0) . " queries" . ($fatal ? ' FATAL: ' . $err['message'] : ''));
 		}
 	});
 
