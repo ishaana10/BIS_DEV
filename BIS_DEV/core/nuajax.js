@@ -1,4 +1,11 @@
-function nuAjax(w, successCallback, errorCallback) {
+// A 503 from the web server is a temporary refusal (too many simultaneous PHP processes / resource limit): the request was not run.
+// Read-only calls are therefore retried twice, after a short pause, before an error is shown.
+function nuAjaxIsRetryable(w) {
+	const readOnly = ['getform', 'getphp', 'getreport', 'getlookupid', 'getlookupcode', 'getfile'];
+	return !!w && readOnly.indexOf(w.call_type) !== -1;
+}
+
+function nuAjax(w, successCallback, errorCallback, nuAttempt = 0) {
 
 	// Tell the server which schema version this browser already holds, so it can skip resending it
 	if (w && window.nuFORM && nuFORM.schemaHash && nuFORM.tableSchema) {
@@ -19,6 +26,12 @@ function nuAjax(w, successCallback, errorCallback) {
 		},
 		success: (data, textStatus, jqXHR) => successCallback(data, textStatus, jqXHR),
 		error: (jqXHR, textStatus, errorThrown) => {
+
+			if (jqXHR.status === 503 && nuAttempt < 2 && nuAjaxIsRetryable(w)) {
+				setTimeout(() => nuAjax(w, successCallback, errorCallback, nuAttempt + 1), 700 * (nuAttempt + 1) + Math.random() * 400);
+				return;
+			}
+
 			// Call error callback if defined
 			if (errorCallback) {
 				errorCallback(jqXHR, textStatus, errorThrown);
