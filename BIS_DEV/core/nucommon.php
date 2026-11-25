@@ -330,10 +330,7 @@ function nuSetHashList($p){
 	}
 
 	$cj = [];
-	$cq = "SELECT sss_hashcookies FROM zzzzsys_session WHERE LENGTH(sss_hashcookies) > 0 AND zzzzsys_session_id = ? ";
-	$ct = nuRunQuery($cq, [$_SESSION['nubuilder_session_data']['SESSION_ID']]);
-
-	$cr = db_fetch_object($ct);
+	$cookies = nuGetSessionHashCookies();
 
 	if (is_null($p)) {
 		$h = [];
@@ -341,8 +338,8 @@ function nuSetHashList($p){
 		$A = [];
 	}
 
-	if (db_num_rows($ct) > 0) {
-		$cj = nuJsonDecode($cr->sss_hashcookies, true);
+	if ($cookies !== null && strlen($cookies) > 0) {
+		$cj = nuJsonDecode($cookies, true);
 		return array_merge($cj, $h, $r, $A);
 	} else {
 		return array_merge($h, $r, $A);
@@ -622,6 +619,24 @@ function nuRunHTML(){
 
 }
 
+function nuGetSessionHashCookies(){
+
+	// sss_hashcookies was read from zzzzsys_session many times per request (MyISAM = table lock each time). Read it once per request;
+	// nuSetProperty() clears the copy. Returns the raw JSON string, or null if there is no value.
+	$sessionId = $_SESSION['nubuilder_session_data']['SESSION_ID'];
+
+	if (!isset($GLOBALS['nuHashCookiesCache']) || !array_key_exists($sessionId, $GLOBALS['nuHashCookiesCache'])) {
+
+		$t = nuRunQuery("SELECT sss_hashcookies FROM zzzzsys_session WHERE zzzzsys_session_id = ? ", [$sessionId]);
+		$r = db_fetch_object($t);
+		$GLOBALS['nuHashCookiesCache'][$sessionId] = $r ? $r->sss_hashcookies : null;
+
+	}
+
+	return $GLOBALS['nuHashCookiesCache'][$sessionId];
+
+}
+
 function nuReplaceHashVariables($s){
 
 	$s	= isset($s) ? nuTrim($s) : '';
@@ -634,13 +649,11 @@ function nuReplaceHashVariables($s){
 
 	if ($a != null) {
 
-		$q	= "SELECT sss_hashcookies FROM zzzzsys_session WHERE zzzzsys_session_id = ? ";
-		$t	= nuRunQuery($q, [$_SESSION['nubuilder_session_data']['SESSION_ID']]);
-		$r	= db_fetch_object($t);
+		$cookies = nuGetSessionHashCookies();
 
-		if (isset($r->sss_hashcookies)) {
+		if (isset($cookies)) {
 
-			$j	= nuJsonDecode($r->sss_hashcookies, true);
+			$j	= nuJsonDecode($cookies, true);
 
 			if (is_array($j)) {
 				$a = array_merge($j, $a);
@@ -893,6 +906,12 @@ function nuGetUserAccess(){
 
 	$sessionData				= $_SESSION['nubuilder_session_data'];
 	$sessionId 					= $sessionData['SESSION_ID'];
+
+	//-- this runs more than once per request: reuse the first result
+	if (isset($GLOBALS['nuUserAccessCache'][$sessionId])) {
+		return $GLOBALS['nuUserAccessCache'][$sessionId];
+	}
+
 	$s							= "SELECT sss_access FROM zzzzsys_session WHERE zzzzsys_session_id = ? ";
 	$t							= nuRunQuery($s, [$sessionId]);
 	$r							= db_fetch_object($t);
@@ -920,14 +939,30 @@ function nuGetUserAccess(){
 
 	//-- update session time
 	if (!isset($sessionData['SESSION_SSS_TIME_EXISTS'])) {
-		$sessionData['SESSION_SSS_TIME_EXISTS']	= in_array("sss_time", db_field_names('zzzzsys_session'));
+		//-- checked once per login and kept in the PHP session (a DESCRIBE on every request was slow)
+		$sessionData['SESSION_SSS_TIME_EXISTS']	= db_num_rows(nuRunQuery("SHOW COLUMNS FROM zzzzsys_session LIKE 'sss_time'")) > 0;
+		$_SESSION['nubuilder_session_data']['SESSION_SSS_TIME_EXISTS'] = $sessionData['SESSION_SSS_TIME_EXISTS'];
 	}
 
 	if ($sessionData['SESSION_SSS_TIME_EXISTS']){
+
+		//-- zzzzsys_session is MyISAM (table-level locks): touch it at most once a minute per login instead of on every request
 		$s = time();
-		nuRunQuery("UPDATE zzzzsys_session SET sss_time = $s WHERE zzzzsys_session_id = ? ", [$sessionId]);
-		nuRunQuery("DELETE FROM zzzzsys_session WHERE sss_time < $s - 36000");										//-- 10 hours
+		if ($s - ($_SESSION['nubuilder_session_data']['SSS_TIME_TOUCHED'] ?? 0) >= 60) {
+
+			nuRunQuery("UPDATE zzzzsys_session SET sss_time = $s WHERE zzzzsys_session_id = ? ", [$sessionId]);
+
+			if (mt_rand(1, 20) == 1) {
+				nuRunQuery("DELETE FROM zzzzsys_session WHERE sss_time < $s - 36000");									//-- 10 hours
+			}
+
+			$_SESSION['nubuilder_session_data']['SSS_TIME_TOUCHED'] = $s;
+
+		}
+
 	}
+
+	$GLOBALS['nuUserAccessCache'][$sessionId] = $A;
 
 	return $A;
 
@@ -1945,10 +1980,16 @@ function nuListTables(){
 
 function nuBuildCurrencyFormats(){
 
-	$t = nuRunQuery("SHOW COLUMNS FROM zzzzsys_format LIKE 'srm_currency'");
+	if (nuGetJSONData('currencyColumnChecked') != '1') {		//-- schema check once per login, not on every request
 
-	if(db_num_rows($t) == 0){
-		nuRunQuery("ALTER TABLE zzzzsys_format ADD srm_currency VARCHAR(25) NULL DEFAULT NULL AFTER srm_format");
+		$t = nuRunQuery("SHOW COLUMNS FROM zzzzsys_format LIKE 'srm_currency'");
+
+		if(db_num_rows($t) == 0){
+			nuRunQuery("ALTER TABLE zzzzsys_format ADD srm_currency VARCHAR(25) NULL DEFAULT NULL AFTER srm_format");
+		}
+
+		nuSetJSONData('currencyColumnChecked', '1');
+
 	}
 
 	$s = "SELECT zzzzsys_format_id, srm_format FROM zzzzsys_format WHERE srm_type = 'Number' AND ISNULL(srm_currency)";
@@ -2169,12 +2210,10 @@ function nuGetProperties() {
 	$a = nuObjKey($_POST, 'nuHash', null);
 	if ($a != null) {
 
-		$q = "SELECT sss_hashcookies FROM zzzzsys_session WHERE zzzzsys_session_id = ? ";
-		$t = nuRunQuery($q, [$_SESSION['nubuilder_session_data']['SESSION_ID']]);
-		$r = db_fetch_object($t);
+		$cookies = nuGetSessionHashCookies();
 
-		if (isset($r->sss_hashcookies)) {
-			$j = nuJsonDecode($r->sss_hashcookies, true);
+		if (isset($cookies)) {
+			$j = nuJsonDecode($cookies, true);
 			if (is_array($j)) {
 				$a = array_merge($j, $a);
 			}
@@ -2210,6 +2249,7 @@ function nuSetProperty($i, $nj, $global = false) {
 			$J = json_encode($j);
 			$s = "UPDATE zzzzsys_session SET sss_hashcookies = ? WHERE zzzzsys_session_id = ? ";
 			$t = nuRunQuery($s, [$J, $_SESSION['nubuilder_session_data']['SESSION_ID']]);
+			unset($GLOBALS['nuHashCookiesCache'][$_SESSION['nubuilder_session_data']['SESSION_ID']]);
 		}
 	} else {
 		$_POST['nuHash'][$i] = $nj;
@@ -2220,12 +2260,10 @@ function nuSetProperty($i, $nj, $global = false) {
 function nuGetGlobalProperties() {
 
 	$a = [];
-	$q = "SELECT sss_hashcookies FROM zzzzsys_session WHERE zzzzsys_session_id = ? ";
-	$t = nuRunQuery($q, [$_SESSION['nubuilder_session_data']['SESSION_ID']]);
-	$r = db_fetch_object($t);
+	$cookies = nuGetSessionHashCookies();
 
-	if (isset($r->sss_hashcookies)) {
-		$j = nuJsonDecode($r->sss_hashcookies, true);
+	if (isset($cookies)) {
+		$j = nuJsonDecode($cookies, true);
 		if (is_array($j)) {
 			$a = array_merge($j, $a);
 		}

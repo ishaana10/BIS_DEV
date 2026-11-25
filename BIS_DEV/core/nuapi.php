@@ -2,6 +2,11 @@
 	header("Content-Type: application/json");
 	header("Cache-Control: no-cache, must-revalidate");
 
+	// Compress the response (each getform call carries ~40 KB of table/form schema JSON)
+	if (extension_loaded('zlib') && !ini_get('zlib.output_compression') && strpos($_SERVER['HTTP_ACCEPT_ENCODING'] ?? '', 'gzip') !== false) {
+		ob_start('ob_gzhandler');
+	}
+
 	$nuState = $_POST['nuSTATE'] ?? null;
 	if ($nuState == null && !empty($_FILES["file"])) {
 		require_once('nuupload.php');
