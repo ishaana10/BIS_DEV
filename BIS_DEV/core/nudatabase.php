@@ -685,11 +685,11 @@ function nuPrepEvalFunctions($code) {
 	//-- PHP 8 throws a TypeError where PHP 7 gave a warning and carried on: in_array($x, null) and count(null). Stored code written for PHP 7 does this
 	//-- without anyone noticing (an empty setting, a missing array). Calls to these two functions in stored code are routed to nuInArray() and nuCount(),
 	//-- which behave as PHP 7 did (false and 0) and write one line to temp/nulog.txt saying where it happened. Only the function name changes: line numbers stay the same.
-	if (!preg_match('/\b(in_array|count|sizeof)\s*\(/i', $code)) {
+	if (!preg_match('/\b(in_array|count|sizeof|array_search|array_key_exists|key_exists)\s*\(/i', $code)) {
 		return $code;
 	}
 
-	$map  = ['in_array' => 'nuInArray', 'count' => 'nuCount', 'sizeof' => 'nuCount'];
+	$map  = ['in_array' => 'nuInArray', 'count' => 'nuCount', 'sizeof' => 'nuCount', 'array_search' => 'nuArraySearch', 'array_key_exists' => 'nuArrayKeyExists', 'key_exists' => 'nuArrayKeyExists'];
 	$skip = [T_OBJECT_OPERATOR, T_DOUBLE_COLON, T_FUNCTION, T_NEW, T_NS_SEPARATOR];
 	if (defined('T_NULLSAFE_OBJECT_OPERATOR')) { $skip[] = T_NULLSAFE_OBJECT_OPERATOR; }
 
@@ -738,6 +738,28 @@ function nuInArray($needle, $haystack, $strict = false) {
 	}
 
 	return in_array($needle, $haystack, $strict);
+
+}
+
+function nuArraySearch($needle, $haystack, $strict = false) {
+
+	if (!is_array($haystack)) {
+		nuPhp8Note('array_search', $haystack, 'false');
+		return false;
+	}
+
+	return array_search($needle, $haystack, $strict);
+
+}
+
+function nuArrayKeyExists($key, $array) {
+
+	if (!is_array($array)) {
+		nuPhp8Note('array_key_exists', $array, 'false');
+		return false;
+	}
+
+	return array_key_exists($key, $array);
 
 }
 
