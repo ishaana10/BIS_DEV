@@ -566,6 +566,35 @@ function nuDebug($a){
 
 }
 
+function nuApplyStatementTimeout($callType) {
+
+	//-- A database query that takes minutes keeps its PHP worker busy; a web host only has a few workers, so a handful of such requests make every other request fail with a 503.
+	//-- (PHP's own max_execution_time does not help: it does not count the time spent waiting for the database.) MariaDB can stop a statement itself after N seconds.
+	//-- Set $nuConfigMaxStatementTime in nuconfig.php: seconds, 0 = no limit. Default 60, below the 100+ seconds a host usually waits before it answers 503.
+	//-- Not applied to runphp / runreport / runhtml (user started jobs that can legitimately run long).
+	global $nuDB;
+
+	if (in_array($callType, ['runphp', 'runreport', 'runhtml'], true)) {
+		return;
+	}
+
+	$seconds = (int) ($GLOBALS['nuConfigMaxStatementTime'] ?? 60);
+	if ($seconds <= 0) {
+		return;
+	}
+
+	try {
+		$nuDB->exec('SET SESSION max_statement_time = ' . $seconds);		//-- MariaDB (MySQL does not know this variable; the error is ignored)
+	} catch (Throwable $e) {
+	}
+
+	//-- backstop for a PHP loop that never ends (database waiting time is not included)
+	if ((int) ini_get('max_execution_time') === 0) {
+		@set_time_limit(max($seconds * 2, 120));
+	}
+
+}
+
 function nuLog($s1, $s2 = '', $s3 = '') {
 
 	$dataToLog = [date("Y-m-d H:i:s"), $s1, $s2, $s3];
