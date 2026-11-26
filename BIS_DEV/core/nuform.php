@@ -167,7 +167,7 @@ function nuGetFormObject($F, $R, $OBJS, $tabs = null){
 	$s = "
 
 	SELECT
-			*
+			zzzzsys_object.*, zzzzsys_tab.*
 		FROM
 			zzzzsys_form
 		INNER JOIN zzzzsys_object ON sob_all_zzzzsys_form_id = zzzzsys_form_id
@@ -252,14 +252,19 @@ function nuGetFormObject($F, $R, $OBJS, $tabs = null){
 				if($r->sob_all_type == 'display'){
 
 					$disS			= nuReplaceHashVariables($r->sob_display_sql);
-					$disT			= nuRunQuery($disS);
 
-					if (db_num_rows($disT) >= 1) {
-						$disR		= db_fetch_row($disT);
-						$o->value	= $disR[0];
-					} else {
-						$o->value	= null;
+					//-- same resolved SQL in the same request (e.g. a display column repeated on every subform row) is run once
+					static $displayCache = [];
+					$disK			= md5($disS);
+
+					if (!array_key_exists($disK, $displayCache)) {
+
+						$disT		= nuRunQuery($disS);
+						$displayCache[$disK] = db_num_rows($disT) >= 1 ? db_fetch_row($disT)[0] : null;
+
 					}
+
+					$o->value		= $displayCache[$disK];
 
 				}
 
@@ -466,6 +471,7 @@ function nuGetFormObject($F, $R, $OBJS, $tabs = null){
 	$f->browse_rows				= nuObjKey($B,0,0);
 	$f->browse_filtered_rows	= nuObjKey($B,1,0);
 	$f->browse_sql				= nuObjKey($B,2,0);
+	$f->browse_count_key		= nuObjKey($B,3,'');
 
 	if ($f->browse_filtered_rows > 0) {
 		nuOnProcess($F, $f, 'BB', 'nuOnProcessBrowseRows');
@@ -965,7 +971,15 @@ function nuSelectOptions($sql) {
 	$sqlFirstChars = nuTrim(substr($sql, 0, 20));
 
 	if (nuStringStartsWith('SELECT', $sqlFirstChars, true) || nuStringStartsWith('WITH', $sqlFirstChars, true)) {	//-- sql statement
-		
+
+		//-- A select column in a subform asked for the same options once per row: run each resolved statement once per request
+		static $optionsCache = [];
+		$optionsKey = md5($sql);
+
+		if (isset($optionsCache[$optionsKey])) {
+			return $optionsCache[$optionsKey];
+		}
+
 		$stmt = nuRunQueryString($sql, $sqlWithHk);
 
 		if (nuErrorFound()) {
@@ -975,6 +989,8 @@ function nuSelectOptions($sql) {
 		while ($row = db_fetch_row($stmt)) {
 			$options[] = $row;
 		}
+
+		$optionsCache[$optionsKey] = $options;
 
 	} elseif (nuStringStartsWith('[', $sqlFirstChars) && is_array(nuJsonDecode($sql))) {								//-- Array style
 			
@@ -1253,11 +1269,25 @@ function nuBrowseRows($f){
 	$tt = nuReplaceHashVariables('#TABLE_ID#');
 	if ($tt != '' && db_num_rows(nuRunQuery('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?', [$tt])) == 0 && stripos($sCount, $tt) !== false) {
 		nuLogOnce('BROWSE', $f->id, "Before Browse of form $f->id did not create its temporary table (" . $tt . "): browse shown empty. Make the Before Browse always create #TABLE_ID#.");
-		return [[], 0, $S->SQL];
+		return [[], 0, $S->SQL, ''];
 	}
 
-	$t = nuRunQuery('SELECT COUNT(*) FROM ('. $sCount . ') nuTCount');
-	$rowData = !nuErrorFound() ? db_fetch_row($t)[0] : 0;
+	//-- The row count only changes when the query, search or filter change, not when the user pages. The browser sends back the count and key from the last page-1
+	//-- result; on pages 2+ with the same key the count is reused, which saves one full COUNT(*) per click. Page 1 (open, search, sort, refresh) always recounts.
+	$countKey	= md5($f->id . '|' . ($tt == '' ? $sCount : str_replace($tt, '#T#', $sCount)));
+	$sentKey	= $P['browse_count_key'] ?? '';
+	$sentCount	= $P['browse_filtered_rows'] ?? null;
+
+	if ($page_number > 0 && $sentKey === $countKey && is_numeric($sentCount) && $sentCount >= 0) {
+
+		$rowData = (int) $sentCount;
+
+	} else {
+
+		$t = nuRunQuery('SELECT COUNT(*) FROM ('. $sCount . ') nuTCount');
+		$rowData = !nuErrorFound() ? db_fetch_row($t)[0] : 0;
+
+	}
 
 	$s				.= " LIMIT " . ($start<0?0:$start) . ", $rows";
 
@@ -1270,7 +1300,7 @@ function nuBrowseRows($f){
 
 	nuRunQuery(nuReplaceHashVariables('DROP TABLE IF EXISTS #TABLE_ID#'));
 
-	return [$a, $rowData, $S->SQL];
+	return [$a, $rowData, $S->SQL, $countKey];
 
 }
 
