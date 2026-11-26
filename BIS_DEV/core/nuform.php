@@ -1249,6 +1249,13 @@ function nuBrowseRows($f){
 		$sCount = str_replace('$'.$f->primary_key.'$',$f->primary_key,$s);
 	}
 
+	//-- A Before Browse that did not create #TABLE_ID# used to raise "Table ... doesn't exist" twice per browse. Show an empty browse instead, and log which form it was.
+	$tt = nuReplaceHashVariables('#TABLE_ID#');
+	if ($tt != '' && db_num_rows(nuRunQuery('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?', [$tt])) == 0 && stripos($sCount, $tt) !== false) {
+		nuLogOnce('BROWSE', $f->id, "Before Browse of form $f->id did not create its temporary table (" . $tt . "): browse shown empty. Make the Before Browse always create #TABLE_ID#.");
+		return [[], 0, $S->SQL];
+	}
+
 	$t = nuRunQuery('SELECT COUNT(*) FROM ('. $sCount . ') nuTCount');
 	$rowData = !nuErrorFound() ? db_fetch_row($t)[0] : 0;
 

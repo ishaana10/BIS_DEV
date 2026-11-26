@@ -4972,6 +4972,20 @@ function nuHighlightSearch() {
 
 function nuChange(e) {
 
+	//-- Guard against change-event loops (a custom handler that calls .change()/.trigger('change') on a field whose change handler does it again).
+	//-- Without it the browser runs out of stack ("Maximum call stack size exceeded") and the page freezes. More than 40 calls for the same field in one
+	//-- tick is never normal: stop the chain and name the field, so the handler that causes it can be found in temp/nulog.txt.
+	var nuLoopId = e.target.id;
+	window.nuChangeTick = window.nuChangeTick || {};
+	if (!window.nuChangeTickTimer) {
+		window.nuChangeTickTimer = setTimeout(function () { window.nuChangeTick = {}; window.nuChangeTickTimer = null; }, 0);
+	}
+	window.nuChangeTick[nuLoopId] = (window.nuChangeTick[nuLoopId] || 0) + 1;
+	if (window.nuChangeTick[nuLoopId] > 40) {
+		window.nuChangeTick[nuLoopId] = -100000;		//-- report once, then stay quiet for the rest of this tick
+		throw new Error('nuChange loop stopped on field ' + nuLoopId + ' (a custom change handler keeps re-triggering it)');
+	}
+
 	if (e.target.id.substr(-8) == 'nuDelete') {
 
 		var sfid = $(e.target).parent().parent().parent()[0].id;
